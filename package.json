@@ -1,0 +1,17 @@
+{
+  "name": "izakaya-qr-ordering",
+  "version": "1.0.0",
+  "description": "Restaurant QR Ordering System with Real-time WebSocket Sync",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5",
+    "qrcode": "^1.5.3",
+    "cors": "^2.8.5",
+    "uuid": "^9.0.1"
+  }
+}
