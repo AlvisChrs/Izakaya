@@ -1,0 +1,289 @@
+import { useEffect, useState } from 'react'
+import { io } from 'socket.io-client'
+import './App.css'
+
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000'
+
+function App() {
+  const [tableId, setTableId] = useState(null)
+  const [table, setTable] = useState(null)
+  const [menu, setMenu] = useState([])
+  const [categories, setCategories] = useState([])
+  const [activeCategory, setActiveCategory] = useState('Appetizer')
+  const [cart, setCart] = useState([])
+  const [orders, setOrders] = useState([])
+  const [notes, setNotes] = useState('')
+  const [showBill, setShowBill] = useState(false)
+  const [bill, setBill] = useState(null)
+  const [socket, setSocket] = useState(null)
+  const [connected, setConnected] = useState(false)
+
+  // Get tableId from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const tId = params.get('table') || 'table-1'
+    setTableId(tId)
+  }, [])
+
+  // Initialize socket
+  useEffect(() => {
+    if (!tableId) return
+
+    const newSocket = io(SOCKET_URL, { transports: ['websocket', 'polling'] })
+    setSocket(newSocket)
+
+    newSocket.on('connect', () => {
+      setConnected(true)
+      newSocket.emit('join-table', tableId)
+    })
+
+    newSocket.on('disconnect', () => setConnected(false))
+
+    newSocket.on('table-state', (data) => {
+      setTable(data.table)
+      setMenu(data.menu)
+      setCategories(data.categories)
+      if (data.categories.length > 0) setActiveCategory(data.categories[0])
+    })
+
+    newSocket.on('order-placed', (order) => {
+      setOrders(prev => [...prev, order])
+      setCart([])
+      setNotes('')
+    })
+
+    newSocket.on('order-status-updated', ({ orderId, status }) => {
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o))
+    })
+
+    newSocket.on('bill-generated', (billData) => {
+      setBill(billData)
+      setShowBill(true)
+    })
+
+    newSocket.on('payment-confirmed', () => {
+      setShowBill(false)
+      setBill(null)
+      setOrders(prev => prev.map(o => ({ ...o, status: 'completed' })))
+    })
+
+    newSocket.on('error', ({ message }) => alert(message))
+
+    return () => newSocket.close()
+  }, [tableId])
+
+  const addToCart = (item) => {
+    setCart(prev => {
+      const existing = prev.find(i => i.menuId === item.id)
+      if (existing) {
+        return prev.map(i => i.menuId === item.id ? { ...i, quantity: i.quantity + 1 } : i)
+      }
+      return [...prev, { menuId: item.id, name: item.name, price: item.price, quantity: 1, notes: '' }]
+    })
+  }
+
+  const updateQuantity = (menuId, delta) => {
+    setCart(prev => {
+      const item = prev.find(i => i.menuId === menuId)
+      if (!item) return prev
+      const newQty = item.quantity + delta
+      if (newQty <= 0) return prev.filter(i => i.menuId !== menuId)
+      return prev.map(i => i.menuId === menuId ? { ...i, quantity: newQty } : i)
+    })
+  }
+
+  const placeOrder = () => {
+    if (cart.length === 0 || !socket) return
+    socket.emit('place-order', { tableId, items: cart, notes })
+  }
+
+  const requestBill = () => {
+    if (!socket) return
+    socket.emit('request-bill', tableId)
+  }
+
+  const payBill = () => {
+    if (!socket) return
+    socket.emit('pay-bill', tableId)
+  }
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'pending': return '#f59e0b'
+      case 'preparing': return '#3b82f6'
+      case 'ready': return '#10b981'
+      case 'completed': return '#6b7280'
+      default: return '#6b7280'
+    }
+  }
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'pending': return 'Menunggu'
+      case 'preparing': return 'Sedang Dibuat'
+      case 'ready': return 'Siap Diantar'
+      case 'completed': return 'Selesai'
+      default: return status
+    }
+  }
+
+  const filteredMenu = menu.filter(item => item.category === activeCategory)
+  const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+
+  if (!tableId) return <div className="loading">Memuat...</div>
+
+  return (
+    <div className="app">
+      <header className="header">
+        <h1>🏮 Izakaya</h1>
+        <div className="table-info">
+          <span>Meja {table?.number || tableId}</span>
+          <span className={connected ? 'connected' : 'disconnected'}>
+            {connected ? '🟢 Terhubung' : '🔴 Terputus'}
+          </span>
+        </div>
+      </header>
+
+      <main className="main">
+        {/* Menu Sidebar */}
+        <aside className="menu-sidebar">
+          <nav className="categories">
+            {categories.map(cat => (
+              <button
+                key={cat}
+                className={activeCategory === cat ? 'active' : ''}
+                onClick={() => setActiveCategory(cat)}
+              >
+                {cat}
+              </button>
+            ))}
+          </nav>
+
+          <div className="menu-items">
+            {filteredMenu.map(item => (
+              <div key={item.id} className="menu-item">
+                <div className="item-info">
+                  <span className="item-emoji">{item.image}</span>
+                  <div>
+                    <h4>{item.name}</h4>
+                    <p className="item-desc">{item.description}</p>
+                    <p className="item-price">Rp {item.price.toLocaleString('id-ID')}</p>
+                  </div>
+                </div>
+                <button className="add-btn" onClick={() => addToCart(item)}>+</button>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        {/* Cart & Orders */}
+        <div className="content">
+          {/* Cart */}
+          <section className="cart-section">
+            <h2>Keranjang {cart.length > 0 && `(${cart.reduce((s, i) => s + i.quantity, 0)})`}</h2>
+            {cart.length === 0 ? (
+              <p className="empty-cart">Keranjang kosong</p>
+            ) : (
+              <>
+                <div className="cart-items">
+                  {cart.map(item => (
+                    <div key={item.menuId} className="cart-item">
+                      <div className="cart-item-info">
+                        <h4>{item.name}</h4>
+                        <p>Rp {item.price.toLocaleString('id-ID')} x {item.quantity}</p>
+                      </div>
+                      <div className="qty-controls">
+                        <button onClick={() => updateQuantity(item.menuId, -1)}>-</button>
+                        <span>{item.quantity}</span>
+                        <button onClick={() => updateQuantity(item.menuId, 1)}>+</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="cart-notes">
+                  <textarea
+                    placeholder="Catatan untuk dapur (opsional)..."
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                    rows={2}
+                  />
+                </div>
+                <div className="cart-total">
+                  <span>Total: Rp {cartTotal.toLocaleString('id-ID')}</span>
+                  <button className="order-btn" onClick={placeOrder} disabled={cart.length === 0}>
+                    Pesan
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+
+          {/* Orders */}
+          <section className="orders-section">
+            <h2>Pesanan Saya</h2>
+            {orders.length === 0 ? (
+              <p className="empty-orders">Belum ada pesanan</p>
+            ) : (
+              <div className="orders-list">
+                {orders.map(order => (
+                  <div key={order.id} className="order-card">
+                    <div className="order-header">
+                      <span>Order #{order.id.slice(0, 8)}</span>
+                      <span
+                        className="status-badge"
+                        style={{ backgroundColor: getStatusColor(order.status) }}
+                      >
+                        {getStatusLabel(order.status)}
+                      </span>
+                    </div>
+                    <div className="order-items">
+                      {order.items.map((item, i) => (
+                        <div key={i} className="order-item">
+                          <span>{item.name} x{item.quantity}</span>
+                          <span>Rp {(item.price * item.quantity).toLocaleString('id-ID')}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="order-total">
+                      Total: Rp {order.total.toLocaleString('id-ID')}
+                    </div>
+                    {order.notes && <p className="order-notes">Catatan: {order.notes}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Bill Modal */}
+            {showBill && bill && (
+              <div className="bill-modal-overlay" onClick={() => setShowBill(false)}>
+                <div className="bill-modal" onClick={e => e.stopPropagation()}>
+                  <h2>🧾 Bill - Meja {bill.tableNumber}</h2>
+                  <div className="bill-items">
+                    {bill.items.map((item, i) => (
+                      <div key={i} className="bill-item">
+                        <span>{item.name} x{item.quantity}</span>
+                        <span>Rp {(item.price * item.quantity).toLocaleString('id-ID')}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="bill-summary">
+                    <div><span>Subtotal</span><span>Rp {bill.subtotal.toLocaleString('id-ID')}</span></div>
+                    <div><span>PPN 11%</span><span>Rp {bill.tax.toLocaleString('id-ID')}</span></div>
+                    <div className="bill-total"><span>Total</span><span>Rp {bill.total.toLocaleString('id-ID')}</span></div>
+                  </div>
+                  <button className="pay-btn" onClick={payBill}>Bayar Sekarang</button>
+                </div>
+              </div>
+            )}
+
+            {!showBill && orders.some(o => o.status !== 'completed') && (
+              <button className="bill-btn" onClick={requestBill}>Minta Bill</button>
+            )}
+          </section>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+export default App
