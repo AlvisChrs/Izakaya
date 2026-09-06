@@ -8,10 +8,12 @@
     "dev": "node server/index.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "socket.io": "^4.7.5",
-    "qrcode": "^1.5.3",
+    "better-sqlite3": "^13.0.3",
     "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "qrcode": "^1.5.3",
+    "socket.io": "^4.7.5",
     "uuid": "^9.0.1"
   }
 }
