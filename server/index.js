@@ -8,6 +8,7 @@ const QRCode = require('qrcode');
 const path = require('path');
 
 const db = require('./db');
+const { validate } = require('./validation');
 
 db.init();
 const s = db.getStatements();
@@ -28,6 +29,10 @@ io.on('connection', (socket) => {
 
   // Customer joins table room
   socket.on('join-table', (tableId) => {
+    if (!validate.tableId(tableId)) {
+      socket.emit('error', { message: 'Invalid table ID' });
+      return;
+    }
     const table = db.getTableWithOrders(tableId);
     const menu = s.getAllMenu.all();
     const categories = s.getMenuCategories.all().map(c => c.category);
@@ -50,10 +55,23 @@ io.on('connection', (socket) => {
 
   // Customer places order
   socket.on('place-order', ({ tableId, items, notes }) => {
+    if (!validate.tableId(tableId)) {
+      socket.emit('error', { message: 'Invalid table ID' });
+      return;
+    }
+    if (!validate.menuItems(items)) {
+      socket.emit('error', { message: 'Invalid order items' });
+      return;
+    }
+    if (!validate.notes(notes)) {
+      socket.emit('error', { message: 'Invalid notes (max 500 characters)' });
+      return;
+    }
+
     const table = s.getTable.get(tableId);
     if (!table) return;
 
-    const orderId = uuidv4();
+    const orderId = validate.generateOrderId();
     const order = {
       id: orderId,
       tableId,
@@ -83,6 +101,15 @@ io.on('connection', (socket) => {
 
   // Kitchen updates order status
   socket.on('update-order-status', ({ orderId, status }) => {
+    if (!validate.orderId(orderId)) {
+      socket.emit('error', { message: 'Invalid order ID' });
+      return;
+    }
+    if (!validate.orderStatus(status)) {
+      socket.emit('error', { message: 'Invalid order status' });
+      return;
+    }
+
     const order = s.getOrderById.get(orderId);
     if (!order) return;
 
@@ -97,6 +124,10 @@ io.on('connection', (socket) => {
 
   // Customer requests bill
   socket.on('request-bill', (tableId) => {
+    if (!validate.tableId(tableId)) {
+      socket.emit('error', { message: 'Invalid table ID' });
+      return;
+    }
     const table = db.getTableWithOrders(tableId);
     if (!table) return;
 
@@ -118,6 +149,10 @@ io.on('connection', (socket) => {
 
   // Customer pays (marks orders as completed)
   socket.on('pay-bill', (tableId) => {
+    if (!validate.tableId(tableId)) {
+      socket.emit('error', { message: 'Invalid table ID' });
+      return;
+    }
     const table = s.getTable.get(tableId);
     if (!table) return;
 
