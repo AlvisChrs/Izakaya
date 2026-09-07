@@ -68,6 +68,16 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Check menu item availability
+    const allMenuItems = s.getAllMenu.all();
+    for (const item of items) {
+      const dbItem = allMenuItems.find(m => m.id === item.menuId);
+      if (!dbItem || dbItem.available === 0) {
+        socket.emit('error', { message: `Menu "${item.name || 'Pilihan'}" sedang habis / out of stock.` });
+        return;
+      }
+    }
+
     const table = s.getTable.get(tableId);
     if (!table) return;
 
@@ -167,11 +177,104 @@ io.on('connection', (socket) => {
   });
 });
 
+// Helper: Broadcast updated menu state to all clients
+function broadcastMenuUpdated() {
+  const menu = s.getAllMenu.all();
+  const categories = s.getMenuCategories.all().map(c => c.category);
+  io.emit('menu-updated', { menu, categories });
+}
+
 // REST endpoints
 app.get('/api/menu', (req, res) => {
   const menu = s.getAllMenu.all();
   const categories = s.getMenuCategories.all().map(c => c.category);
   res.json({ menu, categories });
+});
+
+// Admin: Add new menu item
+app.post('/api/menu', (req, res) => {
+  if (!validate.menuInput(req.body)) {
+    return res.status(400).json({ error: 'Input menu tidak valid' });
+  }
+
+  const { name, price, category, image, description } = req.body;
+  const id = `m_${Date.now()}`;
+  const img = image && image.trim() !== '' ? image.trim() : '🍱';
+  const desc = description ? description.trim() : '';
+
+  try {
+    s.createMenuItem.run(id, name.trim(), price, category.trim(), img, desc, 1);
+    broadcastMenuUpdated();
+    const newMenu = s.getMenuItemById.get(id);
+    res.status(201).json({ message: 'Menu berhasil ditambahkan', menu: newMenu });
+  } catch (err) {
+    console.error('Error creating menu:', err);
+    res.status(500).json({ error: 'Gagal menambahkan menu' });
+  }
+});
+
+// Admin: Update menu item
+app.put('/api/menu/:id', (req, res) => {
+  const { id } = req.params;
+  const existing = s.getMenuItemById.get(id);
+  if (!existing) {
+    return res.status(404).json({ error: 'Menu tidak ditemukan' });
+  }
+
+  if (!validate.menuInput(req.body)) {
+    return res.status(400).json({ error: 'Input menu tidak valid' });
+  }
+
+  const { name, price, category, image, description } = req.body;
+  const img = image && image.trim() !== '' ? image.trim() : existing.image;
+  const desc = description !== undefined ? description.trim() : existing.description;
+
+  try {
+    s.updateMenuItem.run(name.trim(), price, category.trim(), img, desc, id);
+    broadcastMenuUpdated();
+    const updatedMenu = s.getMenuItemById.get(id);
+    res.json({ message: 'Menu berhasil diperbarui', menu: updatedMenu });
+  } catch (err) {
+    console.error('Error updating menu:', err);
+    res.status(500).json({ error: 'Gagal memperbarui menu' });
+  }
+});
+
+// Admin: Toggle menu availability (Out of Stock / Tersedia)
+app.patch('/api/menu/:id/toggle-available', (req, res) => {
+  const { id } = req.params;
+  const existing = s.getMenuItemById.get(id);
+  if (!existing) {
+    return res.status(404).json({ error: 'Menu tidak ditemukan' });
+  }
+
+  const newStatus = existing.available === 1 ? 0 : 1;
+  try {
+    s.toggleMenuAvailability.run(newStatus, id);
+    broadcastMenuUpdated();
+    res.json({ message: `Status menu diubah menjadi ${newStatus === 1 ? 'Tersedia' : 'Stok Habis'}`, available: newStatus });
+  } catch (err) {
+    console.error('Error toggling menu availability:', err);
+    res.status(500).json({ error: 'Gagal mengubah status menu' });
+  }
+});
+
+// Admin: Delete menu item
+app.delete('/api/menu/:id', (req, res) => {
+  const { id } = req.params;
+  const existing = s.getMenuItemById.get(id);
+  if (!existing) {
+    return res.status(404).json({ error: 'Menu tidak ditemukan' });
+  }
+
+  try {
+    s.deleteMenuItem.run(id);
+    broadcastMenuUpdated();
+    res.json({ message: 'Menu berhasil dihapus' });
+  } catch (err) {
+    console.error('Error deleting menu:', err);
+    res.status(500).json({ error: 'Gagal menghapus menu' });
+  }
 });
 
 app.get('/api/tables', (req, res) => {

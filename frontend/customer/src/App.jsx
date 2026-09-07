@@ -67,12 +67,22 @@ function App() {
       setOrders(prev => prev.map(o => ({ ...o, status: 'completed' })))
     })
 
+    newSocket.on('menu-updated', (data) => {
+      setMenu(data.menu)
+      setCategories(data.categories)
+      setCart(prev => prev.filter(cItem => {
+        const menuItem = data.menu.find(m => m.id === cItem.menuId)
+        return menuItem && menuItem.available !== 0
+      }))
+    })
+
     newSocket.on('error', ({ message }) => alert(message))
 
     return () => newSocket.close()
   }, [tableId])
 
   const addToCart = (item) => {
+    if (item.available === 0) return
     setCart(prev => {
       const existing = prev.find(i => i.menuId === item.id)
       if (existing) {
@@ -161,16 +171,26 @@ function App() {
 
           <div className="menu-items">
             {filteredMenu.map(item => (
-              <div key={item.id} className="menu-item">
+              <div key={item.id} className={`menu-item ${item.available === 0 ? 'out-of-stock' : ''}`}>
                 <div className="item-info">
                   <span className="item-emoji">{item.image}</span>
                   <div>
-                    <h4>{item.name}</h4>
+                    <h4>
+                      {item.name}
+                      {item.available === 0 && <span className="sold-out-tag">HABIS</span>}
+                    </h4>
                     <p className="item-desc">{item.description}</p>
                     <p className="item-price">Rp {item.price.toLocaleString('id-ID')}</p>
                   </div>
                 </div>
-                <button className="add-btn" onClick={() => addToCart(item)}>+</button>
+                <button
+                  className="add-btn"
+                  onClick={() => addToCart(item)}
+                  disabled={item.available === 0}
+                  title={item.available === 0 ? 'Stok Habis' : 'Tambah ke Keranjang'}
+                >
+                  {item.available === 0 ? '✕' : '+'}
+                </button>
               </div>
             ))}
           </div>

@@ -23,7 +23,8 @@ function init() {
       price INTEGER NOT NULL,
       category TEXT NOT NULL,
       image TEXT,
-      description TEXT
+      description TEXT,
+      available INTEGER DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS orders (
@@ -41,6 +42,13 @@ function init() {
     CREATE INDEX IF NOT EXISTS idx_orders_timestamp ON orders(timestamp);
   `);
 
+  // Column migration for existing DB
+  try {
+    db.exec(`ALTER TABLE menu ADD COLUMN available INTEGER DEFAULT 1`);
+  } catch (e) {
+    // Column already exists
+  }
+
   // Seed tables if empty
   const tableCount = db.prepare('SELECT COUNT(*) as c FROM tables').get().c;
   if (tableCount === 0) {
@@ -55,25 +63,25 @@ function init() {
   const menuCount = db.prepare('SELECT COUNT(*) as c FROM menu').get().c;
   if (menuCount === 0) {
     const defaultMenu = [
-      { id: 'm1', name: 'Edamame', price: 35000, category: 'Appetizer', image: '🫛', description: 'Rebus kacang edamame dengan garam laut' },
-      { id: 'm2', name: 'Gyoza (5 pcs)', price: 55000, category: 'Appetizer', image: '🥟', description: 'Dumpling goreng isi ayam sayur' },
-      { id: 'm3', name: 'Karaage', price: 65000, category: 'Appetizer', image: '🍗', description: 'Ayam goreng khas Jepang crispy' },
-      { id: 'm4', name: 'Salmon Sashimi (6 pcs)', price: 120000, category: 'Sashimi', image: '🍣', description: 'Salmon segar dipotong tipis' },
-      { id: 'm5', name: 'Tuna Sashimi (6 pcs)', price: 110000, category: 'Sashimi', image: '🍣', description: 'Tuna segar dipotong tipis' },
-      { id: 'm6', name: 'Chicken Teriyaki', price: 85000, category: 'Main', image: '🍗', description: 'Ayam panggang saus teriyaki manis' },
-      { id: 'm7', name: 'Salmon Teriyaki', price: 110000, category: 'Main', image: '🐟', description: 'Salmon panggang saus teriyaki' },
-      { id: 'm8', name: 'Yakisoba', price: 75000, category: 'Main', image: '🍜', description: 'Mie goreng khas Jepang sayur & ayam' },
-      { id: 'm9', name: 'Gyudon', price: 80000, category: 'Main', image: '🍚', description: 'Nasi dengan irisan daging sapi manis' },
-      { id: 'm10', name: 'Miso Soup', price: 25000, category: 'Soup', image: '🍲', description: 'Sup miso tradisional dengan tofu & wakame' },
-      { id: 'm11', name: 'Green Tea Ice Cream', price: 35000, category: 'Dessert', image: '🍵', description: 'Es krim matcha premium' },
-      { id: 'm12', name: 'Mochi Ice Cream (3 pcs)', price: 45000, category: 'Dessert', image: '🍡', description: 'Mochi isi es krim rasa vanilla, strawberry, matcha' },
-      { id: 'm13', name: 'Oolong Tea (Hot/Iced)', price: 20000, category: 'Drink', image: '🍵', description: 'Teh oolong premium' },
-      { id: 'm14', name: 'Ramune Soda', price: 30000, category: 'Drink', image: '🥤', description: 'Minuman soda khas Jepang botol kaca' },
-      { id: 'm15', name: 'Asahi Super Dry', price: 55000, category: 'Drink', image: '🍺', description: 'Bira Jepang ringan & segar' },
+      { id: 'm1', name: 'Edamame', price: 35000, category: 'Appetizer', image: '🫛', description: 'Rebus kacang edamame dengan garam laut', available: 1 },
+      { id: 'm2', name: 'Gyoza (5 pcs)', price: 55000, category: 'Appetizer', image: '🥟', description: 'Dumpling goreng isi ayam sayur', available: 1 },
+      { id: 'm3', name: 'Karaage', price: 65000, category: 'Appetizer', image: '🍗', description: 'Ayam goreng khas Jepang crispy', available: 1 },
+      { id: 'm4', name: 'Salmon Sashimi (6 pcs)', price: 120000, category: 'Sashimi', image: '🍣', description: 'Salmon segar dipotong tipis', available: 1 },
+      { id: 'm5', name: 'Tuna Sashimi (6 pcs)', price: 110000, category: 'Sashimi', image: '🍣', description: 'Tuna segar dipotong tipis', available: 1 },
+      { id: 'm6', name: 'Chicken Teriyaki', price: 85000, category: 'Main', image: '🍗', description: 'Ayam panggang saus teriyaki manis', available: 1 },
+      { id: 'm7', name: 'Salmon Teriyaki', price: 110000, category: 'Main', image: '🐟', description: 'Salmon panggang saus teriyaki', available: 1 },
+      { id: 'm8', name: 'Yakisoba', price: 75000, category: 'Main', image: '🍜', description: 'Mie goreng khas Jepang sayur & ayam', available: 1 },
+      { id: 'm9', name: 'Gyudon', price: 80000, category: 'Main', image: '🍚', description: 'Nasi dengan irisan daging sapi manis', available: 1 },
+      { id: 'm10', name: 'Miso Soup', price: 25000, category: 'Soup', image: '🍲', description: 'Sup miso tradisional dengan tofu & wakame', available: 1 },
+      { id: 'm11', name: 'Green Tea Ice Cream', price: 35000, category: 'Dessert', image: '🍵', description: 'Es krim matcha premium', available: 1 },
+      { id: 'm12', name: 'Mochi Ice Cream (3 pcs)', price: 45000, category: 'Dessert', image: '🍡', description: 'Mochi isi es krim rasa vanilla, strawberry, matcha', available: 1 },
+      { id: 'm13', name: 'Oolong Tea (Hot/Iced)', price: 20000, category: 'Drink', image: '🍵', description: 'Teh oolong premium', available: 1 },
+      { id: 'm14', name: 'Ramune Soda', price: 30000, category: 'Drink', image: '🥤', description: 'Minuman soda khas Jepang botol kaca', available: 1 },
+      { id: 'm15', name: 'Asahi Super Dry', price: 55000, category: 'Drink', image: '🍺', description: 'Bira Jepang ringan & segar', available: 1 },
     ];
-    const insertMenu = db.prepare('INSERT INTO menu (id, name, price, category, image, description) VALUES (?, ?, ?, ?, ?, ?)');
+    const insertMenu = db.prepare('INSERT INTO menu (id, name, price, category, image, description, available) VALUES (?, ?, ?, ?, ?, ?, ?)');
     const insertMany = db.transaction((items) => {
-      for (const m of items) insertMenu.run(m.id, m.name, m.price, m.category, m.image, m.description);
+      for (const m of items) insertMenu.run(m.id, m.name, m.price, m.category, m.image, m.description, m.available);
     });
     insertMany(defaultMenu);
   }
@@ -91,8 +99,13 @@ function getStatements() {
       updateTableQrCode: db.prepare('UPDATE tables SET qr_code = ? WHERE id = ?'),
 
       // Menu
-      getAllMenu: db.prepare('SELECT id, name, price, category, image, description FROM menu'),
+      getAllMenu: db.prepare('SELECT id, name, price, category, image, description, available FROM menu'),
+      getMenuItemById: db.prepare('SELECT id, name, price, category, image, description, available FROM menu WHERE id = ?'),
       getMenuCategories: db.prepare('SELECT DISTINCT category FROM menu ORDER BY category'),
+      createMenuItem: db.prepare('INSERT INTO menu (id, name, price, category, image, description, available) VALUES (?, ?, ?, ?, ?, ?, ?)'),
+      updateMenuItem: db.prepare('UPDATE menu SET name = ?, price = ?, category = ?, image = ?, description = ? WHERE id = ?'),
+      deleteMenuItem: db.prepare('DELETE FROM menu WHERE id = ?'),
+      toggleMenuAvailability: db.prepare('UPDATE menu SET available = ? WHERE id = ?'),
 
       // Orders
       createOrder: db.prepare('INSERT INTO orders (id, table_id, items, notes, status, timestamp, total) VALUES (?, ?, ?, ?, ?, ?, ?)'),

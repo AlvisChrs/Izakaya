@@ -29,6 +29,19 @@ const validate = {
   // Order status
   orderStatus: (status) => ['pending', 'preparing', 'ready', 'completed'].includes(status),
 
+  // Menu item input for CRUD
+  menuInput: (data) => {
+    if (!data || typeof data !== 'object') return false;
+    const { name, price, category, image, description } = data;
+    return (
+      typeof name === 'string' && name.trim().length > 0 && name.length <= 100 &&
+      typeof price === 'number' && price > 0 &&
+      typeof category === 'string' && category.trim().length > 0 && category.length <= 50 &&
+      (image === undefined || typeof image === 'string') &&
+      (description === undefined || typeof description === 'string')
+    );
+  },
+
   // UUID v4 generator for new orders
   generateOrderId: () => uuidv4(),
 };

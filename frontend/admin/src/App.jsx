@@ -17,6 +17,18 @@ function App() {
   const [connected, setConnected] = useState(false)
   const [loading, setLoading] = useState(true)
 
+  // State for Menu Modal
+  const [showMenuModal, setShowMenuModal] = useState(false)
+  const [editingMenu, setEditingMenu] = useState(null)
+  const [menuForm, setMenuForm] = useState({
+    name: '',
+    price: '',
+    category: 'Appetizer',
+    image: '🍱',
+    description: ''
+  })
+  const [customCategory, setCustomCategory] = useState('')
+
   // Fetch initial data via REST
   useEffect(() => {
     fetch(`${API_URL}/api/menu`)
@@ -58,6 +70,11 @@ function App() {
       setOrders(prev => prev.filter(o => o.tableId !== tableId || o.status !== 'completed'))
     })
 
+    newSocket.on('menu-updated', (data) => {
+      setMenu(data.menu)
+      setCategories(data.categories)
+    })
+
     return () => newSocket.close()
   }, [])
 
@@ -65,6 +82,85 @@ function App() {
     setSelectedTable(table)
     setQrCodeData(table.qrCode)
     setShowQRModal(true)
+  }
+
+  const openAddMenuModal = () => {
+    setEditingMenu(null)
+    setMenuForm({
+      name: '',
+      price: '',
+      category: categories.length > 0 ? categories[0] : 'Appetizer',
+      image: '🍱',
+      description: ''
+    })
+    setCustomCategory('')
+    setShowMenuModal(true)
+  }
+
+  const openEditMenuModal = (item) => {
+    setEditingMenu(item)
+    setMenuForm({
+      name: item.name,
+      price: item.price,
+      category: item.category,
+      image: item.image || '🍱',
+      description: item.description || ''
+    })
+    setCustomCategory('')
+    setShowMenuModal(true)
+  }
+
+  const handleToggleAvailable = async (item) => {
+    try {
+      const res = await fetch(`${API_URL}/api/menu/${item.id}/toggle-available`, { method: 'PATCH' })
+      if (!res.ok) throw new Error('Gagal mengedit status stok')
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
+  const handleDeleteMenu = async (item) => {
+    if (!window.confirm(`Yakin ingin menghapus menu "${item.name}"?`)) return
+    try {
+      const res = await fetch(`${API_URL}/api/menu/${item.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Gagal menghapus menu')
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
+  const handleSaveMenu = async (e) => {
+    e.preventDefault()
+    const targetCategory = menuForm.category === 'NEW' ? customCategory.trim() : menuForm.category
+    if (!menuForm.name.trim() || !menuForm.price || !targetCategory) {
+      alert('Mohon isi nama, harga, dan kategori menu!')
+      return
+    }
+
+    const payload = {
+      name: menuForm.name.trim(),
+      price: Number(menuForm.price),
+      category: targetCategory,
+      image: menuForm.image.trim() || '🍱',
+      description: menuForm.description.trim()
+    }
+
+    try {
+      const url = editingMenu ? `${API_URL}/api/menu/${editingMenu.id}` : `${API_URL}/api/menu`
+      const method = editingMenu ? 'PUT' : 'POST'
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      if (!res.ok) {
+        const errData = await res.json()
+        throw new Error(errData.error || 'Gagal menyimpan menu')
+      }
+      setShowMenuModal(false)
+    } catch (err) {
+      alert(err.message)
+    }
   }
 
   const getTableOrders = (tableId) => {
@@ -190,21 +286,46 @@ function App() {
           </div>
         </section>
 
-        {/* Menu Overview */}
+        {/* Menu Overview & CRUD */}
         <section className="menu-section">
-          <h2>Menu ({menu.length} item)</h2>
+          <div className="section-header-flex">
+            <h2>Manajemen Menu ({menu.length} item)</h2>
+            <button className="add-menu-btn" onClick={openAddMenuModal}>
+              ➕ Tambah Menu Baru
+            </button>
+          </div>
+
           <div className="menu-grid">
             {categories.map(cat => (
               <div key={cat} className="category-card">
                 <h3>{cat}</h3>
                 {menu.filter(m => m.category === cat).map(item => (
-                  <div key={item.id} className="menu-item-admin">
+                  <div key={item.id} className={`menu-item-admin ${item.available === 0 ? 'out-of-stock-item' : ''}`}>
                     <span className="item-emoji">{item.image}</span>
                     <div className="item-details">
-                      <span className="item-name">{item.name}</span>
+                      <div className="item-title-row">
+                        <span className="item-name">{item.name}</span>
+                        {item.available === 0 && <span className="stock-badge">Habis</span>}
+                      </div>
                       <span className="item-desc">{item.description}</span>
+                      <span className="item-price">Rp {item.price.toLocaleString('id-ID')}</span>
                     </div>
-                    <span className="item-price">Rp {item.price.toLocaleString('id-ID')}</span>
+
+                    <div className="menu-item-actions">
+                      <button
+                        className={`toggle-stock-btn ${item.available === 1 ? 'in-stock' : 'no-stock'}`}
+                        onClick={() => handleToggleAvailable(item)}
+                        title={item.available === 1 ? 'Tandai Stok Habis' : 'Tandai Tersedia'}
+                      >
+                        {item.available === 1 ? '🟢 Tersedia' : '🔴 Stok Habis'}
+                      </button>
+                      <button className="edit-btn" onClick={() => openEditMenuModal(item)} title="Edit Menu">
+                        ✏️
+                      </button>
+                      <button className="delete-btn" onClick={() => handleDeleteMenu(item)} title="Hapus Menu">
+                        🗑️
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -212,6 +333,98 @@ function App() {
           </div>
         </section>
       </main>
+
+      {/* Add / Edit Menu Modal */}
+      {showMenuModal && (
+        <div className="modal-overlay" onClick={() => setShowMenuModal(false)}>
+          <div className="modal form-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{editingMenu ? '✏️ Edit Menu' : '➕ Tambah Menu Baru'}</h2>
+              <button className="close-btn" onClick={() => setShowMenuModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handleSaveMenu} className="modal-form">
+              <div className="form-group">
+                <label>Nama Menu *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Misal: Ramen Shoyu"
+                  value={menuForm.name}
+                  onChange={e => setMenuForm({ ...menuForm, name: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Harga (Rp) *</label>
+                <input
+                  type="number"
+                  required
+                  min="1000"
+                  step="500"
+                  placeholder="Misal: 45000"
+                  value={menuForm.price}
+                  onChange={e => setMenuForm({ ...menuForm, price: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Kategori *</label>
+                <select
+                  value={menuForm.category}
+                  onChange={e => setMenuForm({ ...menuForm, category: e.target.value })}
+                >
+                  {categories.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                  <option value="NEW">+ Kategori Baru...</option>
+                </select>
+              </div>
+
+              {menuForm.category === 'NEW' && (
+                <div className="form-group">
+                  <label>Nama Kategori Baru *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Misal: Special Yakitori"
+                    value={customCategory}
+                    onChange={e => setCustomCategory(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <div className="form-group">
+                <label>Emoji / Ikon</label>
+                <input
+                  type="text"
+                  placeholder="Misal: 🍜, 🍣, 🍱"
+                  value={menuForm.image}
+                  onChange={e => setMenuForm({ ...menuForm, image: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Deskripsi</label>
+                <textarea
+                  rows={2}
+                  placeholder="Deskripsi singkat makanan/minuman..."
+                  value={menuForm.description}
+                  onChange={e => setMenuForm({ ...menuForm, description: e.target.value })}
+                />
+              </div>
+
+              <div className="form-actions">
+                <button type="button" className="cancel-btn" onClick={() => setShowMenuModal(false)}>
+                  Batal
+                </button>
+                <button type="submit" className="save-btn">
+                  Simpan Menu
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* QR Modal */}
       {showQRModal && selectedTable && (

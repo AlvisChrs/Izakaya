@@ -122,6 +122,24 @@ body {
   transition: transform 0.15s, box-shadow 0.15s;
 }
 
+.menu-item.out-of-stock {
+  opacity: 0.55;
+  background: #fdf2f2;
+  border: 1px dashed #f87171;
+}
+
+.sold-out-tag {
+  display: inline-block;
+  margin-left: 0.5rem;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
 .menu-item:active {
   transform: scale(0.98);
 }
@@ -170,8 +188,14 @@ body {
   transition: background 0.2s;
 }
 
-.add-btn:hover {
+.add-btn:hover:not(:disabled) {
   background: #333;
+}
+
+.add-btn:disabled {
+  background: #d1d5db;
+  color: #9ca3af;
+  cursor: not-allowed;
 }
 
 /* Content Area */
