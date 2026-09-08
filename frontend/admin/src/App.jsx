@@ -10,12 +10,30 @@ function App() {
   const [menu, setMenu] = useState([])
   const [categories, setCategories] = useState([])
   const [orders, setOrders] = useState([])
+  const [waiterRequests, setWaiterRequests] = useState([])
   const [selectedTable, setSelectedTable] = useState(null)
   const [showQRModal, setShowQRModal] = useState(false)
   const [qrCodeData, setQrCodeData] = useState(null)
   const [socket, setSocket] = useState(null)
   const [connected, setConnected] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  // Audio chime for waiter call
+  const playChimeSound = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'triangle'
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime)
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15)
+      gain.gain.setValueAtTime(0.15, ctx.currentTime)
+      osc.start()
+      setTimeout(() => { osc.stop(); ctx.close() }, 400)
+    } catch (e) {}
+  }
 
   // State for Menu Modal
   const [showMenuModal, setShowMenuModal] = useState(false)
@@ -75,8 +93,22 @@ function App() {
       setCategories(data.categories)
     })
 
+    newSocket.on('waiter-requests-updated', (requests) => {
+      setWaiterRequests(requests)
+    })
+
+    newSocket.on('waiter-called', (request) => {
+      setWaiterRequests(prev => [...prev.filter(r => r.tableId !== request.tableId), request])
+      playChimeSound()
+    })
+
     return () => newSocket.close()
   }, [])
+
+  const handleResolveWaiterRequest = (requestId) => {
+    if (!socket) return
+    socket.emit('resolve-waiter-request', requestId)
+  }
 
   const showQR = (table) => {
     setSelectedTable(table)
@@ -222,22 +254,60 @@ function App() {
       </header>
 
       <main className="main">
+        {/* Active Waiter Calls Section */}
+        {waiterRequests.length > 0 && (
+          <section className="waiter-calls-section">
+            <div className="section-title-row">
+              <h2>🛎️ Panggilan Pelayan Aktif ({waiterRequests.length})</h2>
+            </div>
+            <div className="waiter-calls-grid">
+              {waiterRequests.map(req => (
+                <div key={req.id} className="waiter-call-card">
+                  <div className="waiter-call-header">
+                    <span className="waiter-table-badge">Meja {req.tableNumber}</span>
+                    <span className="waiter-call-time">
+                      {new Date(req.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <div className="waiter-call-type">
+                    📌 <strong>{req.requestType}</strong>
+                  </div>
+                  <button
+                    className="resolve-waiter-btn"
+                    onClick={() => handleResolveWaiterRequest(req.id)}
+                  >
+                    ✅ Selesai / Dilayani
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Tables Grid */}
         <section className="tables-section">
           <h2>Manajemen Meja</h2>
           <div className="tables-grid">
             {tables.map(table => {
               const tableOrders = getTableOrders(table.id)
+              const activeWaitReq = waiterRequests.find(r => r.tableId === table.id)
               const pendingCount = tableOrders.filter(o => o.status === 'pending').length
               const preparingCount = tableOrders.filter(o => o.status === 'preparing').length
               const readyCount = tableOrders.filter(o => o.status === 'ready').length
 
               return (
-                <div key={table.id} className="table-card">
+                <div key={table.id} className={`table-card ${activeWaitReq ? 'table-card-waiter-calling' : ''}`}>
                   <div className="table-header">
                     <span className="table-number">Meja {table.number}</span>
                     <button className="qr-btn" onClick={() => showQR(table)}>📱 QR</button>
                   </div>
+
+                  {activeWaitReq && (
+                    <div className="waiter-call-mini-badge">
+                      <span>🔔 Memanggil: <strong>{activeWaitReq.requestType}</strong></span>
+                      <button onClick={() => handleResolveWaiterRequest(activeWaitReq.id)}>✓</button>
+                    </div>
+                  )}
                   
                   <div className="table-status">
                     {tableOrders.length === 0 ? (

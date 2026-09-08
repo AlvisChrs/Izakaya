@@ -278,6 +278,69 @@ body {
   margin-top: auto;
 }
 
+/* Kitchen Waiter Banner Styles */
+.kitchen-waiter-banner {
+  background: #7f1d1d;
+  color: #fecaca;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 2px solid #ef4444;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.kitchen-waiter-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #fee2e2;
+}
+
+.kitchen-waiter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.kitchen-waiter-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #991b1b;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #fca5a5;
+  font-size: 0.85rem;
+}
+
+.kw-badge {
+  background: #ef4444;
+  color: #fff;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+}
+
+.kw-desc {
+  color: #fff;
+  font-weight: 600;
+}
+
+.kitchen-waiter-item button {
+  background: #10b981;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-left: 0.25rem;
+}
+
+.kitchen-waiter-item button:hover {
+  background: #059669;
+}
+
 /* Responsive */
 @media (max-width: 600px) {
   .orders-grid {

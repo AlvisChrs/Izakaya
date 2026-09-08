@@ -15,6 +15,8 @@ function App() {
   const [notes, setNotes] = useState('')
   const [showBill, setShowBill] = useState(false)
   const [bill, setBill] = useState(null)
+  const [showWaiterModal, setShowWaiterModal] = useState(false)
+  const [activeWaiterRequest, setActiveWaiterRequest] = useState(null)
   const [socket, setSocket] = useState(null)
   const [connected, setConnected] = useState(false)
 
@@ -43,6 +45,7 @@ function App() {
       setTable(data.table)
       setMenu(data.menu)
       setCategories(data.categories)
+      if (data.activeWaiterRequest) setActiveWaiterRequest(data.activeWaiterRequest)
       if (data.categories.length > 0) setActiveCategory(data.categories[0])
     })
 
@@ -76,10 +79,29 @@ function App() {
       }))
     })
 
+    newSocket.on('waiter-request-active', (request) => {
+      setActiveWaiterRequest(request)
+      setShowWaiterModal(false)
+    })
+
+    newSocket.on('waiter-request-resolved', () => {
+      setActiveWaiterRequest(null)
+    })
+
     newSocket.on('error', ({ message }) => alert(message))
 
     return () => newSocket.close()
   }, [tableId])
+
+  const handleCallWaiter = (requestType) => {
+    if (!socket || !tableId) return
+    socket.emit('call-waiter', { tableId, requestType })
+  }
+
+  const handleCancelWaiterCall = () => {
+    if (!socket || !tableId) return
+    socket.emit('cancel-waiter-request', tableId)
+  }
 
   const addToCart = (item) => {
     if (item.available === 0) return
@@ -146,13 +168,31 @@ function App() {
     <div className="app">
       <header className="header">
         <h1>🏮 Izakaya</h1>
-        <div className="table-info">
-          <span>Meja {table?.number || tableId}</span>
-          <span className={connected ? 'connected' : 'disconnected'}>
-            {connected ? '🟢 Terhubung' : '🔴 Terputus'}
-          </span>
+        <div className="header-actions">
+          <button className="call-waiter-header-btn" onClick={() => setShowWaiterModal(true)}>
+            🛎️ Panggil Pelayan
+          </button>
+          <div className="table-info">
+            <span>Meja {table?.number || tableId}</span>
+            <span className={connected ? 'connected' : 'disconnected'}>
+              {connected ? '🟢 Terhubung' : '🔴 Terputus'}
+            </span>
+          </div>
         </div>
       </header>
+
+      {/* Active Waiter Call Banner */}
+      {activeWaiterRequest && (
+        <div className="waiter-active-banner">
+          <div className="waiter-banner-content">
+            <span className="waiter-pulse">🔔</span>
+            <span>Pelayan sedang menuju meja Anda (Minta: <strong>{activeWaiterRequest.requestType}</strong>)</span>
+          </div>
+          <button className="cancel-waiter-btn" onClick={handleCancelWaiterCall}>
+            Batal
+          </button>
+        </div>
+      )}
 
       <main className="main">
         {/* Menu Sidebar */}
@@ -302,6 +342,45 @@ function App() {
           </section>
         </div>
       </main>
+
+      {/* Call Waiter Modal */}
+      {showWaiterModal && (
+        <div className="waiter-modal-overlay" onClick={() => setShowWaiterModal(false)}>
+          <div className="waiter-modal" onClick={e => e.stopPropagation()}>
+            <div className="waiter-modal-header">
+              <h2>🛎️ Panggil Pelayan</h2>
+              <button className="close-btn" onClick={() => setShowWaiterModal(false)}>✕</button>
+            </div>
+            <p className="waiter-modal-subtitle">Pilih bantuan yang Anda butuhkan di Meja {table?.number || tableId}:</p>
+            
+            <div className="waiter-options-grid">
+              <button className="waiter-option-btn" onClick={() => handleCallWaiter('Refill Air / Oolong Tea')}>
+                <span className="option-icon">🍵</span>
+                <span className="option-title">Refill Minuman</span>
+                <span className="option-sub">Air putih / Teh Oolong</span>
+              </button>
+
+              <button className="waiter-option-btn" onClick={() => handleCallWaiter('Minta Sendok / Garpu / Sumpit / Tisu')}>
+                <span className="option-icon">🥢</span>
+                <span className="option-title">Alat Makan & Tisu</span>
+                <span className="option-sub">Sumpit, sendok, mangkuk, tisu</span>
+              </button>
+
+              <button className="waiter-option-btn" onClick={() => handleCallWaiter('Panggil Kasir / Minta Bill')}>
+                <span className="option-icon">🧾</span>
+                <span className="option-title">Pembayaran / Bill</span>
+                <span className="option-sub">Panggil kasir ke meja</span>
+              </button>
+
+              <button className="waiter-option-btn" onClick={() => handleCallWaiter('Bantuan Pelayan / Umum')}>
+                <span className="option-icon">🙋</span>
+                <span className="option-title">Bantuan Lainnya</span>
+                <span className="option-sub">Panggil pelayan ke meja</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

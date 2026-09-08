@@ -23,6 +23,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
+// Memory store for active waiter calls
+let activeWaiterRequests = [];
+
 // Socket.io connection handling
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
@@ -38,7 +41,8 @@ io.on('connection', (socket) => {
     const categories = s.getMenuCategories.all().map(c => c.category);
     if (table) {
       socket.join(`table-${tableId}`);
-      socket.emit('table-state', { table, menu, categories });
+      const activeReq = activeWaiterRequests.find(r => r.tableId === tableId);
+      socket.emit('table-state', { table, menu, categories, activeWaiterRequest: activeReq || null });
       console.log(`Customer joined table ${table.number}`);
     } else {
       socket.emit('error', { message: 'Meja tidak ditemukan' });
@@ -50,7 +54,62 @@ io.on('connection', (socket) => {
     socket.join('kitchen');
     const allOrders = db.getAllPendingOrdersWithTable();
     socket.emit('kitchen-orders', allOrders);
+    socket.emit('waiter-requests-updated', activeWaiterRequests);
     console.log('Kitchen staff joined');
+  });
+
+  // Customer calls waiter
+  socket.on('call-waiter', ({ tableId, requestType }) => {
+    if (!validate.waiterRequest({ tableId, requestType })) {
+      socket.emit('error', { message: 'Permintaan panggil pelayan tidak valid' });
+      return;
+    }
+
+    const table = s.getTable.get(tableId);
+    if (!table) return;
+
+    // Replace previous active request for this table if any
+    activeWaiterRequests = activeWaiterRequests.filter(r => r.tableId !== tableId);
+
+    const request = {
+      id: uuidv4(),
+      tableId,
+      tableNumber: table.number,
+      requestType,
+      timestamp: Date.now()
+    };
+
+    activeWaiterRequests.push(request);
+
+    // Notify kitchen & admin staff
+    io.to('kitchen').emit('waiter-called', request);
+    io.to('kitchen').emit('waiter-requests-updated', activeWaiterRequests);
+    // Notify table customer
+    io.to(`table-${tableId}`).emit('waiter-request-active', request);
+
+    console.log(`Waiter called by Table ${table.number}: ${requestType}`);
+  });
+
+  // Customer cancels waiter request
+  socket.on('cancel-waiter-request', (tableId) => {
+    if (!validate.tableId(tableId)) return;
+
+    activeWaiterRequests = activeWaiterRequests.filter(r => r.tableId !== tableId);
+    io.to('kitchen').emit('waiter-requests-updated', activeWaiterRequests);
+    io.to(`table-${tableId}`).emit('waiter-request-resolved', { tableId });
+    console.log(`Waiter request cancelled by tableId ${tableId}`);
+  });
+
+  // Staff resolves waiter request
+  socket.on('resolve-waiter-request', (requestId) => {
+    const reqObj = activeWaiterRequests.find(r => r.id === requestId);
+    activeWaiterRequests = activeWaiterRequests.filter(r => r.id !== requestId);
+
+    io.to('kitchen').emit('waiter-requests-updated', activeWaiterRequests);
+    if (reqObj) {
+      io.to(`table-${reqObj.tableId}`).emit('waiter-request-resolved', { tableId: reqObj.tableId });
+      console.log(`Waiter request ${requestId} resolved for Table ${reqObj.tableNumber}`);
+    }
   });
 
   // Customer places order

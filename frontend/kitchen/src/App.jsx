@@ -6,11 +6,11 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000'
 
 function App() {
   const [orders, setOrders] = useState([])
+  const [waiterRequests, setWaiterRequests] = useState([])
   const [socket, setSocket] = useState(null)
   const [connected, setConnected] = useState(false)
   const [filterStatus, setFilterStatus] = useState('all')
   const [soundEnabled, setSoundEnabled] = useState(true)
-  const audioRef = useState(new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT'))
 
   // Initialize socket
   useEffect(() => {
@@ -42,8 +42,22 @@ function App() {
       setOrders(prev => prev.filter(o => o.tableId !== tableId || o.status !== 'completed'))
     })
 
+    newSocket.on('waiter-requests-updated', (requests) => {
+      setWaiterRequests(requests)
+    })
+
+    newSocket.on('waiter-called', (request) => {
+      setWaiterRequests(prev => [...prev.filter(r => r.tableId !== request.tableId), request])
+      if (soundEnabled) playNotification()
+    })
+
     return () => newSocket.close()
   }, [soundEnabled])
+
+  const handleResolveWaiterRequest = (requestId) => {
+    if (!socket) return
+    socket.emit('resolve-waiter-request', requestId)
+  }
 
   const playNotification = () => {
     // Simple beep using Web Audio API
@@ -133,6 +147,24 @@ function App() {
           </label>
         </div>
       </header>
+
+      {/* Active Waiter Calls Banner in Kitchen */}
+      {waiterRequests.length > 0 && (
+        <div className="kitchen-waiter-banner">
+          <div className="kitchen-waiter-title">
+            <span>🔔 Panggilan Pelayan ({waiterRequests.length})</span>
+          </div>
+          <div className="kitchen-waiter-list">
+            {waiterRequests.map(req => (
+              <div key={req.id} className="kitchen-waiter-item">
+                <span className="kw-badge">Meja {req.tableNumber}</span>
+                <span className="kw-desc">{req.requestType}</span>
+                <button onClick={() => handleResolveWaiterRequest(req.id)}>✅ Selesai</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="stats-bar">
         <div className="stat all">Total: {orders.length}</div>

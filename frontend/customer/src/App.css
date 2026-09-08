@@ -505,6 +505,161 @@ body {
   background: #059669;
 }
 
+/* Call Waiter Header & Banner Styles */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.call-waiter-header-btn {
+  padding: 0.5rem 0.9rem;
+  background: #f59e0b;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
+  transition: background 0.2s, transform 0.1s;
+}
+
+.call-waiter-header-btn:hover {
+  background: #d97706;
+  transform: translateY(-1px);
+}
+
+.waiter-active-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  background: #fef3c7;
+  border-bottom: 2px solid #f59e0b;
+  color: #92400e;
+  font-size: 0.85rem;
+  animation: slideDown 0.25s ease-out;
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.waiter-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.waiter-pulse {
+  display: inline-block;
+  animation: bellRing 1.2s infinite ease-in-out;
+}
+
+@keyframes bellRing {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(15deg); }
+  75% { transform: rotate(-15deg); }
+}
+
+.cancel-waiter-btn {
+  padding: 0.3rem 0.75rem;
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cancel-waiter-btn:hover {
+  background: #b91c1c;
+}
+
+/* Call Waiter Modal */
+.waiter-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 1000;
+}
+
+.waiter-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 420px;
+}
+
+.waiter-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.waiter-modal-header h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.waiter-modal-subtitle {
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 1.25rem;
+}
+
+.waiter-options-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.waiter-option-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 1rem;
+  background: #faf8f5;
+  border: 1px solid #e8e0d8;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.waiter-option-btn:hover {
+  background: #f5f0e8;
+  border-color: #f59e0b;
+  transform: translateY(-2px);
+}
+
+.option-icon {
+  font-size: 1.6rem;
+  margin-bottom: 0.4rem;
+}
+
+.option-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #1a1a1a;
+  margin-bottom: 0.15rem;
+}
+
+.option-sub {
+  font-size: 0.7rem;
+  color: #777;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .main {

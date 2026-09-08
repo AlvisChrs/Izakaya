@@ -42,6 +42,17 @@ const validate = {
     );
   },
 
+  // Waiter request validation
+  waiterRequest: (data) => {
+    if (!data || typeof data !== 'object') return false;
+    return (
+      validate.tableId(data.tableId) &&
+      typeof data.requestType === 'string' &&
+      data.requestType.trim().length > 0 &&
+      data.requestType.length <= 100
+    );
+  },
+
   // UUID v4 generator for new orders
   generateOrderId: () => uuidv4(),
 };
