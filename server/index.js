@@ -9,6 +9,7 @@ const path = require('path');
 
 const db = require('./db');
 const { validate } = require('./validation');
+const auth = require('./auth');
 
 db.init();
 const s = db.getStatements();
@@ -30,7 +31,7 @@ let activeWaiterRequests = [];
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
-  // Customer joins table room
+  // Customer joins table room (no auth needed for customers)
   socket.on('join-table', (tableId) => {
     if (!validate.tableId(tableId)) {
       socket.emit('error', { message: 'Invalid table ID' });
@@ -49,8 +50,12 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Kitchen staff joins kitchen room
-  socket.on('join-kitchen', () => {
+  // Kitchen staff joins kitchen room (requires kitchen token)
+  socket.on('join-kitchen', (token) => {
+    if (!auth.validateKitchenToken(token)) {
+      socket.emit('error', { message: 'Unauthorized: Kitchen token required' });
+      return;
+    }
     socket.join('kitchen');
     const allOrders = db.getAllPendingOrdersWithTable();
     socket.emit('kitchen-orders', allOrders);
@@ -100,8 +105,12 @@ io.on('connection', (socket) => {
     console.log(`Waiter request cancelled by tableId ${tableId}`);
   });
 
-  // Staff resolves waiter request
-  socket.on('resolve-waiter-request', (requestId) => {
+  // Staff resolves waiter request (requires staff token)
+  socket.on('resolve-waiter-request', ({ requestId, token }) => {
+    if (!auth.validateAdminToken(token) && !auth.validateKitchenToken(token)) {
+      socket.emit('error', { message: 'Unauthorized: Staff token required' });
+      return;
+    }
     const reqObj = activeWaiterRequests.find(r => r.id === requestId);
     activeWaiterRequests = activeWaiterRequests.filter(r => r.id !== requestId);
 
@@ -168,8 +177,12 @@ io.on('connection', (socket) => {
     console.log(`New order ${orderId} from table ${table.number}`);
   });
 
-  // Kitchen updates order status
-  socket.on('update-order-status', ({ orderId, status }) => {
+  // Kitchen updates order status (requires kitchen token)
+  socket.on('update-order-status', ({ orderId, status, token }) => {
+    if (!auth.validateKitchenToken(token)) {
+      socket.emit('error', { message: 'Unauthorized: Kitchen token required' });
+      return;
+    }
     if (!validate.orderId(orderId)) {
       socket.emit('error', { message: 'Invalid order ID' });
       return;
@@ -244,14 +257,14 @@ function broadcastMenuUpdated() {
 }
 
 // REST endpoints
-app.get('/api/menu', (req, res) => {
+app.get('/api/menu', auth.requireAdmin, (req, res) => {
   const menu = s.getAllMenu.all();
   const categories = s.getMenuCategories.all().map(c => c.category);
   res.json({ menu, categories });
 });
 
 // Admin: Add new menu item
-app.post('/api/menu', (req, res) => {
+app.post('/api/menu', auth.requireAdmin, (req, res) => {
   if (!validate.menuInput(req.body)) {
     return res.status(400).json({ error: 'Input menu tidak valid' });
   }
@@ -273,7 +286,7 @@ app.post('/api/menu', (req, res) => {
 });
 
 // Admin: Update menu item
-app.put('/api/menu/:id', (req, res) => {
+app.put('/api/menu/:id', auth.requireAdmin, (req, res) => {
   const { id } = req.params;
   const existing = s.getMenuItemById.get(id);
   if (!existing) {
@@ -300,7 +313,7 @@ app.put('/api/menu/:id', (req, res) => {
 });
 
 // Admin: Toggle menu availability (Out of Stock / Tersedia)
-app.patch('/api/menu/:id/toggle-available', (req, res) => {
+app.patch('/api/menu/:id/toggle-available', auth.requireAdmin, (req, res) => {
   const { id } = req.params;
   const existing = s.getMenuItemById.get(id);
   if (!existing) {
@@ -319,7 +332,7 @@ app.patch('/api/menu/:id/toggle-available', (req, res) => {
 });
 
 // Admin: Delete menu item
-app.delete('/api/menu/:id', (req, res) => {
+app.delete('/api/menu/:id', auth.requireAdmin, (req, res) => {
   const { id } = req.params;
   const existing = s.getMenuItemById.get(id);
   if (!existing) {
@@ -336,12 +349,12 @@ app.delete('/api/menu/:id', (req, res) => {
   }
 });
 
-app.get('/api/tables', (req, res) => {
+app.get('/api/tables', auth.requireAdmin, (req, res) => {
   const tableList = s.getAllTables.all();
   res.json(tableList);
 });
 
-app.get('/api/tables/:tableId', (req, res) => {
+app.get('/api/tables/:tableId', auth.requireAdmin, (req, res) => {
   const table = db.getTableWithOrders(req.params.tableId);
   if (table) {
     const menu = s.getAllMenu.all();

@@ -3,6 +3,90 @@ import { io } from 'socket.io-client'
 import './App.css'
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000'
+const KITCHEN_TOKEN_KEY = 'izakaya_kitchen_token'
+
+function LoginPage({ onLogin }) {
+  const [token, setToken] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+
+    try {
+      // Test the token by connecting to socket
+      const { io } = await import('socket.io-client')
+      const testSocket = io(SOCKET_URL, {
+        transports: ['websocket', 'polling'],
+        auth: { token: token.trim() }
+      })
+
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timeout')), 5000)
+        testSocket.on('connect', () => {
+          clearTimeout(timeout)
+          // Try to join kitchen to validate token
+          testSocket.emit('join-kitchen', token.trim())
+        })
+        testSocket.on('error', ({ message }) => {
+          clearTimeout(timeout)
+          testSocket.close()
+          if (message.includes('Unauthorized')) {
+            reject(new Error('Token kitchen tidak valid'))
+          } else {
+            reject(new Error(message))
+          }
+        })
+        testSocket.on('kitchen-orders', () => {
+          clearTimeout(timeout)
+          testSocket.close()
+          resolve()
+        })
+      })
+
+      localStorage.setItem(KITCHEN_TOKEN_KEY, token.trim())
+      onLogin(token.trim())
+    } catch (err) {
+      setError(err.message || 'Gagal menghubungi server')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="login-container">
+      <div className="login-card">
+        <div className="login-header">
+          <h1>🍳 Dapur Izakaya</h1>
+          <p>Masukkan token kitchen untuk mengakses panel</p>
+        </div>
+        <form onSubmit={handleSubmit} className="login-form">
+          {error && <div className="login-error">{error}</div>}
+          <div className="form-group">
+            <label htmlFor="token">Kitchen Token</label>
+            <input
+              id="token"
+              type="password"
+              placeholder="Masukkan kitchen token"
+              value={token}
+              onChange={e => setToken(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+          <button type="submit" className="login-btn" disabled={loading}>
+            {loading ? 'Memverifikasi...' : 'Masuk'}
+          </button>
+        </form>
+        <div className="login-hint">
+          <small>Token default development: <code>kitchen-dev-token-change-in-production</code></small>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function App() {
   const [orders, setOrders] = useState([])
@@ -11,15 +95,30 @@ function App() {
   const [connected, setConnected] = useState(false)
   const [filterStatus, setFilterStatus] = useState('all')
   const [soundEnabled, setSoundEnabled] = useState(true)
+  const [kitchenToken, setKitchenToken] = useState(null)
+  const [loading, setLoading] = useState(true)
 
-  // Initialize socket
+  // Check for stored token on mount
   useEffect(() => {
-    const newSocket = io(SOCKET_URL, { transports: ['websocket', 'polling'] })
+    const stored = localStorage.getItem(KITCHEN_TOKEN_KEY)
+    if (stored) {
+      setKitchenToken(stored)
+    }
+  }, [])
+
+  // Initialize socket for real-time updates (requires kitchen token)
+  useEffect(() => {
+    if (!kitchenToken) return
+
+    const newSocket = io(SOCKET_URL, {
+      transports: ['websocket', 'polling'],
+      auth: { token: kitchenToken }
+    })
     setSocket(newSocket)
 
     newSocket.on('connect', () => {
       setConnected(true)
-      newSocket.emit('join-kitchen')
+      newSocket.emit('join-kitchen', kitchenToken)
     })
 
     newSocket.on('disconnect', () => setConnected(false))
@@ -51,16 +150,30 @@ function App() {
       if (soundEnabled) playNotification()
     })
 
+    newSocket.on('error', ({ message }) => {
+      if (message.includes('Unauthorized')) {
+        handleLogout()
+      }
+    })
+
     return () => newSocket.close()
-  }, [soundEnabled])
+  }, [kitchenToken, soundEnabled])
+
+  const handleLogout = () => {
+    localStorage.removeItem(KITCHEN_TOKEN_KEY)
+    setKitchenToken(null)
+    setSocket(null)
+    setConnected(false)
+    setOrders([])
+    setWaiterRequests([])
+  }
 
   const handleResolveWaiterRequest = (requestId) => {
-    if (!socket) return
-    socket.emit('resolve-waiter-request', requestId)
+    if (!socket || !kitchenToken) return
+    socket.emit('resolve-waiter-request', { requestId, token: kitchenToken })
   }
 
   const playNotification = () => {
-    // Simple beep using Web Audio API
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)()
       const osc = ctx.createOscillator()
@@ -78,8 +191,8 @@ function App() {
   }
 
   const updateStatus = (orderId, newStatus) => {
-    if (!socket) return
-    socket.emit('update-order-status', { orderId, status: newStatus })
+    if (!socket || !kitchenToken) return
+    socket.emit('update-order-status', { orderId, status: newStatus, token: kitchenToken })
   }
 
   const getStatusColor = (status) => {
@@ -111,10 +224,9 @@ function App() {
     }
   }
 
-  const filteredOrders = orders.filter(o => 
+  const filteredOrders = orders.filter(o =>
     filterStatus === 'all' || o.status === filterStatus
   ).sort((a, b) => {
-    // Sort by status priority then timestamp
     const statusPriority = { pending: 0, preparing: 1, ready: 2, completed: 3 }
     const aPri = statusPriority[a.status] ?? 99
     const bPri = statusPriority[b.status] ?? 99
@@ -126,6 +238,14 @@ function App() {
     acc[o.status] = (acc[o.status] || 0) + 1
     return acc
   }, {})
+
+  if (!kitchenToken) {
+    return <LoginPage onLogin={setKitchenToken} />
+  }
+
+  if (loading) {
+    return <div className="loading">Memuat data...</div>
+  }
 
   return (
     <div className="app">
@@ -145,6 +265,7 @@ function App() {
             />
             <span>🔊 Notifikasi</span>
           </label>
+          <button className="logout-btn" onClick={handleLogout}>Logout</button>
         </div>
       </header>
 

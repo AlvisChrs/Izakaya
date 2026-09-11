@@ -1,172 +1,290 @@
-import { useEffect, useState } from 'react'
-import { io } from 'socket.io-client'
-import './App.css'
+import { useState, useEffect } from 'react';
+import { io } from 'socket.io-client';
+import './App.css';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000'
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+const ADMIN_TOKEN_KEY = 'izakaya_admin_token';
+
+function LoginPage({ onLogin }) {
+  const [token, setToken] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${API_URL}/api/menu`, {
+        headers: { 'Authorization': `Bearer ${token.trim()}` }
+      });
+      if (res.ok) {
+        localStorage.setItem(ADMIN_TOKEN_KEY, token.trim());
+        onLogin(token.trim());
+      } else {
+        setError('Token admin tidak valid');
+      }
+    } catch (err) {
+      setError('Gagal menghubungi server');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="login-container">
+      <div className="login-card">
+        <div className="login-header">
+          <h1>📊 Admin Izakaya</h1>
+          <p>Masukkan token admin untuk mengakses panel</p>
+        </div>
+        <form onSubmit={handleSubmit} className="login-form">
+          {error && <div className="login-error">{error}</div>}
+          <div className="form-group">
+            <label htmlFor="token">Admin Token</label>
+            <input
+              id="token"
+              type="password"
+              placeholder="Masukkan admin token"
+              value={token}
+              onChange={e => setToken(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+          <button type="submit" className="login-btn" disabled={loading}>
+            {loading ? 'Memverifikasi...' : 'Masuk'}
+          </button>
+        </form>
+        <div className="login-hint">
+          <small>Token default development: <code>admin-dev-token-change-in-production</code></small>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function App() {
-  const [tables, setTables] = useState([])
-  const [menu, setMenu] = useState([])
-  const [categories, setCategories] = useState([])
-  const [orders, setOrders] = useState([])
-  const [waiterRequests, setWaiterRequests] = useState([])
-  const [selectedTable, setSelectedTable] = useState(null)
-  const [showQRModal, setShowQRModal] = useState(false)
-  const [qrCodeData, setQrCodeData] = useState(null)
-  const [socket, setSocket] = useState(null)
-  const [connected, setConnected] = useState(false)
-  const [loading, setLoading] = useState(true)
-
-  // Audio chime for waiter call
-  const playChimeSound = () => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)()
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.type = 'triangle'
-      osc.frequency.setValueAtTime(587.33, ctx.currentTime)
-      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15)
-      gain.gain.setValueAtTime(0.15, ctx.currentTime)
-      osc.start()
-      setTimeout(() => { osc.stop(); ctx.close() }, 400)
-    } catch (e) {}
-  }
-
-  // State for Menu Modal
-  const [showMenuModal, setShowMenuModal] = useState(false)
-  const [editingMenu, setEditingMenu] = useState(null)
+  const [tables, setTables] = useState([]);
+  const [menu, setMenu] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [waiterRequests, setWaiterRequests] = useState([]);
+  const [selectedTable, setSelectedTable] = useState(null);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [qrCodeData, setQrCodeData] = useState(null);
+  const [socket, setSocket] = useState(null);
+  const [connected, setConnected] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [adminToken, setAdminToken] = useState(null);
+  const [showMenuModal, setShowMenuModal] = useState(false);
+  const [editingMenu, setEditingMenu] = useState(null);
   const [menuForm, setMenuForm] = useState({
     name: '',
     price: '',
     category: 'Appetizer',
     image: '🍱',
     description: ''
-  })
-  const [customCategory, setCustomCategory] = useState('')
+  });
+  const [customCategory, setCustomCategory] = useState('');
 
-  // Fetch initial data via REST
+  // Audio chime for waiter call
+  const playChimeSound = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      osc.start();
+      setTimeout(() => { osc.stop(); ctx.close() }, 400);
+    } catch (e) {}
+  };
+
+  // Check for stored token on mount
   useEffect(() => {
-    fetch(`${API_URL}/api/menu`)
-      .then(r => r.json())
-      .then(data => { setMenu(data.menu); setCategories(data.categories) })
-      .catch(console.error)
+    const stored = localStorage.getItem(ADMIN_TOKEN_KEY);
+    if (stored) {
+      setAdminToken(stored);
+    }
+  }, []);
 
-    fetch(`${API_URL}/api/tables`)
-      .then(r => r.json())
-      .then(data => { setTables(data); setLoading(false) })
-      .catch(console.error)
-  }, [])
-
-  // Initialize socket for real-time updates
+  // Fetch initial data via REST (requires admin token)
   useEffect(() => {
-    const newSocket = io(SOCKET_URL, { transports: ['websocket', 'polling'] })
-    setSocket(newSocket)
+    if (!adminToken) return;
+
+    const fetchData = async () => {
+      try {
+        const headers = { 'Authorization': `Bearer ${adminToken}` };
+        const [menuRes, tablesRes] = await Promise.all([
+          fetch(`${API_URL}/api/menu`, { headers }),
+          fetch(`${API_URL}/api/tables`, { headers })
+        ]);
+        if (menuRes.ok) {
+          const data = await menuRes.json();
+          setMenu(data.menu);
+          setCategories(data.categories);
+        }
+        if (tablesRes.ok) {
+          const data = await tablesRes.json();
+          setTables(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch initial data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [adminToken]);
+
+  // Initialize socket for real-time updates (requires admin token)
+  useEffect(() => {
+    if (!adminToken) return;
+
+    const newSocket = io(SOCKET_URL, {
+      transports: ['websocket', 'polling'],
+      auth: { token: adminToken }
+    });
+    setSocket(newSocket);
 
     newSocket.on('connect', () => {
-      setConnected(true)
-      newSocket.emit('join-kitchen')
-    })
+      setConnected(true);
+      newSocket.emit('join-kitchen'); // Admin also joins kitchen room to get orders
+    });
 
-    newSocket.on('disconnect', () => setConnected(false))
+    newSocket.on('disconnect', () => setConnected(false));
 
     newSocket.on('kitchen-orders', (orderList) => {
-      setOrders(orderList)
-    })
+      setOrders(orderList);
+    });
 
     newSocket.on('new-order', (order) => {
-      setOrders(prev => [...prev, order].sort((a, b) => a.timestamp - b.timestamp))
-    })
+      setOrders(prev => [...prev, order].sort((a, b) => a.timestamp - b.timestamp));
+    });
 
     newSocket.on('order-status-updated', ({ orderId, status }) => {
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o))
-    })
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+    });
 
     newSocket.on('orders-completed', ({ tableId }) => {
-      setOrders(prev => prev.filter(o => o.tableId !== tableId || o.status !== 'completed'))
-    })
+      setOrders(prev => prev.filter(o => o.tableId !== tableId || o.status !== 'completed'));
+    });
 
     newSocket.on('menu-updated', (data) => {
-      setMenu(data.menu)
-      setCategories(data.categories)
-    })
+      setMenu(data.menu);
+      setCategories(data.categories);
+    });
 
     newSocket.on('waiter-requests-updated', (requests) => {
-      setWaiterRequests(requests)
-    })
+      setWaiterRequests(requests);
+    });
 
     newSocket.on('waiter-called', (request) => {
-      setWaiterRequests(prev => [...prev.filter(r => r.tableId !== request.tableId), request])
-      playChimeSound()
-    })
+      setWaiterRequests(prev => [...prev.filter(r => r.tableId !== request.tableId), request]);
+      playChimeSound();
+    });
 
-    return () => newSocket.close()
-  }, [])
+    newSocket.on('error', ({ message }) => {
+      if (message.includes('Unauthorized')) {
+        handleLogout();
+      }
+    });
+
+    return () => newSocket.close();
+  }, [adminToken]);
+
+  const handleLogout = () => {
+    localStorage.removeItem(ADMIN_TOKEN_KEY);
+    setAdminToken(null);
+    setSocket(null);
+    setConnected(false);
+    setTables([]);
+    setMenu([]);
+    setCategories([]);
+    setOrders([]);
+    setWaiterRequests([]);
+  };
 
   const handleResolveWaiterRequest = (requestId) => {
-    if (!socket) return
-    socket.emit('resolve-waiter-request', requestId)
-  }
+    if (!socket || !adminToken) return;
+    socket.emit('resolve-waiter-request', { requestId, token: adminToken });
+  };
 
   const showQR = (table) => {
-    setSelectedTable(table)
-    setQrCodeData(table.qrCode)
-    setShowQRModal(true)
-  }
+    setSelectedTable(table);
+    setQrCodeData(table.qrCode);
+    setShowQRModal(true);
+  };
 
   const openAddMenuModal = () => {
-    setEditingMenu(null)
+    setEditingMenu(null);
     setMenuForm({
       name: '',
       price: '',
       category: categories.length > 0 ? categories[0] : 'Appetizer',
       image: '🍱',
       description: ''
-    })
-    setCustomCategory('')
-    setShowMenuModal(true)
-  }
+    });
+    setCustomCategory('');
+    setShowMenuModal(true);
+  };
 
   const openEditMenuModal = (item) => {
-    setEditingMenu(item)
+    setEditingMenu(item);
     setMenuForm({
       name: item.name,
       price: item.price,
       category: item.category,
       image: item.image || '🍱',
       description: item.description || ''
-    })
-    setCustomCategory('')
-    setShowMenuModal(true)
-  }
+    });
+    setCustomCategory('');
+    setShowMenuModal(true);
+  };
 
   const handleToggleAvailable = async (item) => {
+    if (!adminToken) return;
     try {
-      const res = await fetch(`${API_URL}/api/menu/${item.id}/toggle-available`, { method: 'PATCH' })
-      if (!res.ok) throw new Error('Gagal mengedit status stok')
+      const res = await fetch(`${API_URL}/api/menu/${item.id}/toggle-available`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      });
+      if (!res.ok) throw new Error('Gagal mengedit status stok');
     } catch (err) {
-      alert(err.message)
+      alert(err.message);
     }
-  }
+  };
 
   const handleDeleteMenu = async (item) => {
-    if (!window.confirm(`Yakin ingin menghapus menu "${item.name}"?`)) return
+    if (!adminToken) return;
+    if (!window.confirm(`Yakin ingin menghapus menu "${item.name}"?`)) return;
     try {
-      const res = await fetch(`${API_URL}/api/menu/${item.id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Gagal menghapus menu')
+      const res = await fetch(`${API_URL}/api/menu/${item.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      });
+      if (!res.ok) throw new Error('Gagal menghapus menu');
     } catch (err) {
-      alert(err.message)
+      alert(err.message);
     }
-  }
+  };
 
   const handleSaveMenu = async (e) => {
-    e.preventDefault()
-    const targetCategory = menuForm.category === 'NEW' ? customCategory.trim() : menuForm.category
+    e.preventDefault();
+    if (!adminToken) return;
+    
+    const targetCategory = menuForm.category === 'NEW' ? customCategory.trim() : menuForm.category;
     if (!menuForm.name.trim() || !menuForm.price || !targetCategory) {
-      alert('Mohon isi nama, harga, dan kategori menu!')
-      return
+      alert('Mohon isi nama, harga, dan kategori menu!');
+      return;
     }
 
     const payload = {
@@ -175,58 +293,65 @@ function App() {
       category: targetCategory,
       image: menuForm.image.trim() || '🍱',
       description: menuForm.description.trim()
-    }
+    };
 
     try {
-      const url = editingMenu ? `${API_URL}/api/menu/${editingMenu.id}` : `${API_URL}/api/menu`
-      const method = editingMenu ? 'PUT' : 'POST'
+      const url = editingMenu ? `${API_URL}/api/menu/${editingMenu.id}` : `${API_URL}/api/menu`;
+      const method = editingMenu ? 'PUT' : 'POST';
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
+        },
         body: JSON.stringify(payload)
-      })
+      });
       if (!res.ok) {
-        const errData = await res.json()
-        throw new Error(errData.error || 'Gagal menyimpan menu')
+        const errData = await res.json();
+        throw new Error(errData.error || 'Gagal menyimpan menu');
       }
-      setShowMenuModal(false)
+      setShowMenuModal(false);
     } catch (err) {
-      alert(err.message)
+      alert(err.message);
     }
-  }
+  };
 
   const getTableOrders = (tableId) => {
-    return orders.filter(o => o.tableId === tableId && o.status !== 'completed')
-  }
+    return orders.filter(o => o.tableId === tableId && o.status !== 'completed');
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'pending': return '#f59e0b'
-      case 'preparing': return '#3b82f6'
-      case 'ready': return '#10b981'
-      case 'completed': return '#6b7280'
-      default: return '#6b7280'
+      case 'pending': return '#f59e0b';
+      case 'preparing': return '#3b82f6';
+      case 'ready': return '#10b981';
+      case 'completed': return '#6b7280';
+      default: return '#6b7280';
     }
-  }
+  };
 
   const getStatusLabel = (status) => {
     switch (status) {
-      case 'pending': return 'Menunggu'
-      case 'preparing': return 'Memasak'
-      case 'ready': return 'Siap'
-      case 'completed': return 'Selesai'
-      default: return status
+      case 'pending': return 'Menunggu';
+      case 'preparing': return 'Memasak';
+      case 'ready': return 'Siap';
+      case 'completed': return 'Selesai';
+      default: return status;
     }
+  };
+
+  if (!adminToken) {
+    return <LoginPage onLogin={setAdminToken} />;
   }
 
   if (loading) {
-    return <div className="loading">Memuat data...</div>
+    return <div className="loading">Memuat data...</div>;
   }
 
-  const activeOrdersCount = orders.filter(o => o.status !== 'completed').length
+  const activeOrdersCount = orders.filter(o => o.status !== 'completed').length;
   const totalRevenue = orders
     .filter(o => o.status === 'completed')
-    .reduce((sum, o) => sum + o.total, 0)
+    .reduce((sum, o) => sum + o.total, 0);
 
   return (
     <div className="app">
@@ -250,6 +375,7 @@ function App() {
             <span className="stat-value">Rp {totalRevenue.toLocaleString('id-ID')}</span>
             <span className="stat-label">Pendapatan</span>
           </div>
+          <button className="logout-btn" onClick={handleLogout}>Logout</button>
         </div>
       </header>
 
@@ -289,11 +415,11 @@ function App() {
           <h2>Manajemen Meja</h2>
           <div className="tables-grid">
             {tables.map(table => {
-              const tableOrders = getTableOrders(table.id)
-              const activeWaitReq = waiterRequests.find(r => r.tableId === table.id)
-              const pendingCount = tableOrders.filter(o => o.status === 'pending').length
-              const preparingCount = tableOrders.filter(o => o.status === 'preparing').length
-              const readyCount = tableOrders.filter(o => o.status === 'ready').length
+              const tableOrders = getTableOrders(table.id);
+              const activeWaitReq = waiterRequests.find(r => r.tableId === table.id);
+              const pendingCount = tableOrders.filter(o => o.status === 'pending').length;
+              const preparingCount = tableOrders.filter(o => o.status === 'preparing').length;
+              const readyCount = tableOrders.filter(o => o.status === 'ready').length;
 
               return (
                 <div key={table.id} className={`table-card ${activeWaitReq ? 'table-card-waiter-calling' : ''}`}>
@@ -308,7 +434,7 @@ function App() {
                       <button onClick={() => handleResolveWaiterRequest(activeWaitReq.id)}>✓</button>
                     </div>
                   )}
-                  
+
                   <div className="table-status">
                     {tableOrders.length === 0 ? (
                       <span className="status-empty">Kosong</span>
@@ -341,7 +467,7 @@ function App() {
                   )}
 
                   <div className="table-actions">
-                    <a 
+                    <a
                       href={`${window.location.origin}/customer.html?table=${table.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -351,7 +477,7 @@ function App() {
                     </a>
                   </div>
                 </div>
-              )
+              );
             })}
           </div>
         </section>
@@ -499,30 +625,24 @@ function App() {
       {/* QR Modal */}
       {showQRModal && selectedTable && (
         <div className="modal-overlay" onClick={() => setShowQRModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="modal qr-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>QR Code - Meja {selectedTable.number}</h2>
+              <h2>📱 QR Code Meja {selectedTable.number}</h2>
               <button className="close-btn" onClick={() => setShowQRModal(false)}>✕</button>
             </div>
-            <div className="modal-body">
-              {qrCodeData && (
-                <img src={qrCodeData} alt={`QR Meja ${selectedTable.number}`} className="qr-image" />
+            <div className="qr-content">
+              {qrCodeData ? (
+                <img src={qrCodeData} alt={`QR Code Meja ${selectedTable.number}`} />
+              ) : (
+                <p>QR Code belum digenerate</p>
               )}
-              <p className="qr-url">
-                {window.location.origin}/customer.html?table={selectedTable.id}
-              </p>
-              <button className="copy-btn" onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/customer.html?table=${selectedTable.id}`)
-                alert('Link disalin!')
-              }}>
-                📋 Salin Link
-              </button>
+              <p className="qr-hint">Scan untuk membuka menu customer</p>
             </div>
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
