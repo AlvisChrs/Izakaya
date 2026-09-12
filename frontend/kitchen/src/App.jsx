@@ -28,7 +28,7 @@ function LoginPage({ onLogin }) {
         testSocket.on('connect', () => {
           clearTimeout(timeout)
           // Try to join kitchen to validate token
-          testSocket.emit('join-kitchen', token.trim())
+          testSocket.emit('join-kitchen')
         })
         testSocket.on('error', ({ message }) => {
           clearTimeout(timeout)
@@ -81,7 +81,7 @@ function LoginPage({ onLogin }) {
           </button>
         </form>
         <div className="login-hint">
-          <small>Token default development: <code>kitchen-dev-token-change-in-production</code></small>
+          <small>Gunakan token yang dikonfigurasi oleh administrator server.</small>
         </div>
       </div>
     </div>
@@ -118,7 +118,7 @@ function App() {
 
     newSocket.on('connect', () => {
       setConnected(true)
-      newSocket.emit('join-kitchen', kitchenToken)
+      newSocket.emit('join-kitchen')
     })
 
     newSocket.on('disconnect', () => setConnected(false))
@@ -170,7 +170,7 @@ function App() {
 
   const handleResolveWaiterRequest = (requestId) => {
     if (!socket || !kitchenToken) return
-    socket.emit('resolve-waiter-request', { requestId, token: kitchenToken })
+    socket.emit('resolve-waiter-request', { requestId })
   }
 
   const playNotification = () => {
@@ -192,7 +192,7 @@ function App() {
 
   const updateStatus = (orderId, newStatus) => {
     if (!socket || !kitchenToken) return
-    socket.emit('update-order-status', { orderId, status: newStatus, token: kitchenToken })
+    socket.emit('update-order-status', { orderId, status: newStatus })
   }
 
   const getStatusColor = (status) => {

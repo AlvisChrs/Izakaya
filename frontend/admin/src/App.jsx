@@ -60,7 +60,7 @@ function LoginPage({ onLogin }) {
           </button>
         </form>
         <div className="login-hint">
-          <small>Token default development: <code>admin-dev-token-change-in-production</code></small>
+          <small>Gunakan token yang dikonfigurasi oleh administrator server.</small>
         </div>
       </div>
     </div>
@@ -215,7 +215,7 @@ function App() {
 
   const handleResolveWaiterRequest = (requestId) => {
     if (!socket || !adminToken) return;
-    socket.emit('resolve-waiter-request', { requestId, token: adminToken });
+    socket.emit('resolve-waiter-request', { requestId });
   };
 
   const showQR = (table) => {

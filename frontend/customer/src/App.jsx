@@ -6,6 +6,7 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000'
 
 function App() {
   const [tableId, setTableId] = useState(null)
+  const [tableAccessToken, setTableAccessToken] = useState(null)
   const [table, setTable] = useState(null)
   const [menu, setMenu] = useState([])
   const [categories, setCategories] = useState([])
@@ -24,7 +25,9 @@ function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const tId = params.get('table') || 'table-1'
+    const accessToken = params.get('access')
     setTableId(tId)
+    setTableAccessToken(accessToken)
   }, [])
 
   // Initialize socket
@@ -36,7 +39,7 @@ function App() {
 
     newSocket.on('connect', () => {
       setConnected(true)
-      newSocket.emit('join-table', tableId)
+      newSocket.emit('join-table', { tableId, token: tableAccessToken })
     })
 
     newSocket.on('disconnect', () => setConnected(false))
@@ -91,7 +94,7 @@ function App() {
     newSocket.on('error', ({ message }) => alert(message))
 
     return () => newSocket.close()
-  }, [tableId])
+  }, [tableId, tableAccessToken])
 
   const handleCallWaiter = (requestType) => {
     if (!socket || !tableId) return
