@@ -13,8 +13,6 @@ const validate = {
     if (!item || typeof item !== 'object') return false;
     return (
       typeof item.menuId === 'string' && item.menuId.startsWith('m') &&
-      typeof item.name === 'string' && item.name.length > 0 &&
-      typeof item.price === 'number' && item.price > 0 &&
       typeof item.quantity === 'number' && Number.isInteger(item.quantity) && item.quantity > 0 &&
       (item.notes === undefined || typeof item.notes === 'string')
     );

@@ -20,6 +20,12 @@ const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
+io.use((socket, next) => {
+  const handshakeToken = socket.handshake.auth?.token || socket.handshake.query?.token;
+  socket.data.staffRole = auth.getStaffRole(handshakeToken);
+  next();
+});
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
@@ -31,16 +37,32 @@ let activeWaiterRequests = [];
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
-  // Customer joins table room (no auth needed for customers)
-  socket.on('join-table', (tableId) => {
+  const requireTableSession = (tableId) => {
+    if (socket.data.tableId !== tableId) {
+      socket.emit('error', { message: 'Unauthorized: Invalid table session' });
+      return false;
+    }
+    return true;
+  };
+
+  // Customer joins a table using the unguessable token embedded in its QR code.
+  socket.on('join-table', ({ tableId, token } = {}) => {
     if (!validate.tableId(tableId)) {
       socket.emit('error', { message: 'Invalid table ID' });
+      return;
+    }
+    const tableToken = s.getTableAccessToken.get(tableId)?.accessToken;
+    if (!auth.validateTableToken(token, tableToken)) {
+      socket.emit('error', { message: 'Unauthorized: Invalid table access token' });
       return;
     }
     const table = db.getTableWithOrders(tableId);
     const menu = s.getAllMenu.all();
     const categories = s.getMenuCategories.all().map(c => c.category);
     if (table) {
+      if (socket.data.tableId) socket.leave(`table-${socket.data.tableId}`);
+      socket.data.tableId = tableId;
+      socket.data.tableToken = token;
       socket.join(`table-${tableId}`);
       const activeReq = activeWaiterRequests.find(r => r.tableId === tableId);
       socket.emit('table-state', { table, menu, categories, activeWaiterRequest: activeReq || null });
@@ -51,8 +73,8 @@ io.on('connection', (socket) => {
   });
 
   // Kitchen staff joins kitchen room (requires kitchen token)
-  socket.on('join-kitchen', (token) => {
-    if (!auth.validateKitchenToken(token)) {
+  socket.on('join-kitchen', () => {
+    if (socket.data.staffRole !== 'admin' && socket.data.staffRole !== 'kitchen') {
       socket.emit('error', { message: 'Unauthorized: Kitchen token required' });
       return;
     }
@@ -65,6 +87,7 @@ io.on('connection', (socket) => {
 
   // Customer calls waiter
   socket.on('call-waiter', ({ tableId, requestType }) => {
+    if (!requireTableSession(tableId)) return;
     if (!validate.waiterRequest({ tableId, requestType })) {
       socket.emit('error', { message: 'Permintaan panggil pelayan tidak valid' });
       return;
@@ -81,7 +104,8 @@ io.on('connection', (socket) => {
       tableId,
       tableNumber: table.number,
       requestType,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      socketId: socket.id
     };
 
     activeWaiterRequests.push(request);
@@ -97,17 +121,22 @@ io.on('connection', (socket) => {
 
   // Customer cancels waiter request
   socket.on('cancel-waiter-request', (tableId) => {
-    if (!validate.tableId(tableId)) return;
+    if (!validate.tableId(tableId) || !requireTableSession(tableId)) return;
+    const request = activeWaiterRequests.find(r => r.tableId === tableId && r.socketId === socket.id);
+    if (!request) {
+      socket.emit('error', { message: 'Unauthorized: You do not own this waiter request' });
+      return;
+    }
 
-    activeWaiterRequests = activeWaiterRequests.filter(r => r.tableId !== tableId);
+    activeWaiterRequests = activeWaiterRequests.filter(r => r.id !== request.id);
     io.to('kitchen').emit('waiter-requests-updated', activeWaiterRequests);
     io.to(`table-${tableId}`).emit('waiter-request-resolved', { tableId });
     console.log(`Waiter request cancelled by tableId ${tableId}`);
   });
 
   // Staff resolves waiter request (requires staff token)
-  socket.on('resolve-waiter-request', ({ requestId, token }) => {
-    if (!auth.validateAdminToken(token) && !auth.validateKitchenToken(token)) {
+  socket.on('resolve-waiter-request', ({ requestId }) => {
+    if (socket.data.staffRole !== 'admin' && socket.data.staffRole !== 'kitchen') {
       socket.emit('error', { message: 'Unauthorized: Staff token required' });
       return;
     }
@@ -123,10 +152,7 @@ io.on('connection', (socket) => {
 
   // Customer places order
   socket.on('place-order', ({ tableId, items, notes }) => {
-    if (!validate.tableId(tableId)) {
-      socket.emit('error', { message: 'Invalid table ID' });
-      return;
-    }
+    if (!validate.tableId(tableId) || !requireTableSession(tableId)) return;
     if (!validate.menuItems(items)) {
       socket.emit('error', { message: 'Invalid order items' });
       return;
@@ -138,12 +164,20 @@ io.on('connection', (socket) => {
 
     // Check menu item availability
     const allMenuItems = s.getAllMenu.all();
+    const authoritativeItems = [];
     for (const item of items) {
       const dbItem = allMenuItems.find(m => m.id === item.menuId);
       if (!dbItem || dbItem.available === 0) {
-        socket.emit('error', { message: `Menu "${item.name || 'Pilihan'}" sedang habis / out of stock.` });
+        socket.emit('error', { message: `Menu "${dbItem?.name || 'Pilihan'}" sedang habis / out of stock.` });
         return;
       }
+      authoritativeItems.push({
+        menuId: dbItem.id,
+        name: dbItem.name,
+        price: dbItem.price,
+        quantity: item.quantity,
+        notes: item.notes || ''
+      });
     }
 
     const table = s.getTable.get(tableId);
@@ -154,17 +188,11 @@ io.on('connection', (socket) => {
       id: orderId,
       tableId,
       tableNumber: table.number,
-      items: items.map(item => ({
-        menuId: item.menuId,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        notes: item.notes || ''
-      })),
+      items: authoritativeItems,
       notes: notes || '',
       status: 'pending',
       timestamp: Date.now(),
-      total: items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+      total: authoritativeItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
     };
 
     s.createOrder.run(orderId, tableId, JSON.stringify(order.items), order.notes, order.status, order.timestamp, order.total);
@@ -178,8 +206,8 @@ io.on('connection', (socket) => {
   });
 
   // Kitchen updates order status (requires kitchen token)
-  socket.on('update-order-status', ({ orderId, status, token }) => {
-    if (!auth.validateKitchenToken(token)) {
+  socket.on('update-order-status', ({ orderId, status }) => {
+    if (socket.data.staffRole !== 'kitchen') {
       socket.emit('error', { message: 'Unauthorized: Kitchen token required' });
       return;
     }
@@ -206,10 +234,7 @@ io.on('connection', (socket) => {
 
   // Customer requests bill
   socket.on('request-bill', (tableId) => {
-    if (!validate.tableId(tableId)) {
-      socket.emit('error', { message: 'Invalid table ID' });
-      return;
-    }
+    if (!validate.tableId(tableId) || !requireTableSession(tableId)) return;
     const table = db.getTableWithOrders(tableId);
     if (!table) return;
 
@@ -231,10 +256,7 @@ io.on('connection', (socket) => {
 
   // Customer pays (marks orders as completed)
   socket.on('pay-bill', (tableId) => {
-    if (!validate.tableId(tableId)) {
-      socket.emit('error', { message: 'Invalid table ID' });
-      return;
-    }
+    if (!validate.tableId(tableId) || !requireTableSession(tableId)) return;
     const table = s.getTable.get(tableId);
     if (!table) return;
 
@@ -390,12 +412,13 @@ server.listen(PORT, async () => {
   const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
   const tables = s.getAllTables.all();
   for (const table of tables) {
-    const url = `${baseUrl}/customer.html?table=${table.id}`;
+    const accessToken = s.getTableAccessToken.get(table.id)?.accessToken;
+    const url = `${baseUrl}/customer.html?table=${table.id}&access=${encodeURIComponent(accessToken)}`;
     const qrCode = await QRCode.toDataURL(url);
     s.updateTableQrCode.run(qrCode, table.id);
   }
   console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Customer: http://localhost:${PORT}/customer.html?table=table-1`);
+  console.log('Customer: scan the table QR code to open the ordering page');
   console.log(`Kitchen: http://localhost:${PORT}/kitchen.html`);
   console.log(`Admin: http://localhost:${PORT}/admin.html`);
   console.log(`Health: http://localhost:${PORT}/health`);

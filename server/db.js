@@ -14,7 +14,8 @@ function init() {
     CREATE TABLE IF NOT EXISTS tables (
       id TEXT PRIMARY KEY,
       number INTEGER UNIQUE NOT NULL,
-      qr_code TEXT
+      qr_code TEXT,
+      access_token TEXT UNIQUE
     );
 
     CREATE TABLE IF NOT EXISTS menu (
@@ -47,6 +48,18 @@ function init() {
     db.exec(`ALTER TABLE menu ADD COLUMN available INTEGER DEFAULT 1`);
   } catch (e) {
     // Column already exists
+  }
+
+  try {
+    db.exec(`ALTER TABLE tables ADD COLUMN access_token TEXT`);
+  } catch (e) {
+    // Column already exists
+  }
+
+  const tablesWithoutTokens = db.prepare('SELECT id FROM tables WHERE access_token IS NULL').all();
+  const setTableAccessToken = db.prepare('UPDATE tables SET access_token = ? WHERE id = ?');
+  for (const table of tablesWithoutTokens) {
+    setTableAccessToken.run(uuidv4() + uuidv4(), table.id);
   }
 
   // Seed tables if empty
@@ -96,6 +109,7 @@ function getStatements() {
       // Tables
       getAllTables: db.prepare('SELECT id, number, qr_code as qrCode FROM tables'),
       getTable: db.prepare('SELECT id, number, qr_code as qrCode FROM tables WHERE id = ?'),
+      getTableAccessToken: db.prepare('SELECT access_token as accessToken FROM tables WHERE id = ?'),
       updateTableQrCode: db.prepare('UPDATE tables SET qr_code = ? WHERE id = ?'),
 
       // Menu

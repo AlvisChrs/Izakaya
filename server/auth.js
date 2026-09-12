@@ -1,12 +1,16 @@
 require('dotenv').config();
 const crypto = require('crypto');
 
-// Load tokens from environment (fallback to generated for dev)
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'admin-dev-token-change-in-production';
-const KITCHEN_TOKEN = process.env.KITCHEN_TOKEN || 'kitchen-dev-token-change-in-production';
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
+const KITCHEN_TOKEN = process.env.KITCHEN_TOKEN;
+
+if (!ADMIN_TOKEN || !KITCHEN_TOKEN) {
+  throw new Error('ADMIN_TOKEN and KITCHEN_TOKEN must be configured before starting the server');
+}
 
 // Secure compare to prevent timing attacks
 function secureCompare(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
   const aBuf = Buffer.from(a);
   const bBuf = Buffer.from(b);
   if (aBuf.length !== bBuf.length) return false;
@@ -21,6 +25,16 @@ function validateAdminToken(token) {
 // Validate kitchen token
 function validateKitchenToken(token) {
   return token && secureCompare(token, KITCHEN_TOKEN);
+}
+
+function getStaffRole(token) {
+  if (validateAdminToken(token)) return 'admin';
+  if (validateKitchenToken(token)) return 'kitchen';
+  return null;
+}
+
+function validateTableToken(token, expectedToken) {
+  return Boolean(token && expectedToken && secureCompare(token, expectedToken));
 }
 
 // Extract token from request (header or query)
@@ -102,6 +116,8 @@ function staffSocketMiddleware(socket, next) {
 module.exports = {
   validateAdminToken,
   validateKitchenToken,
+  getStaffRole,
+  validateTableToken,
   extractToken,
   requireAdmin,
   requireKitchen,
