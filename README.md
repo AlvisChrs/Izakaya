@@ -75,7 +75,7 @@ Server berjalan di `http://localhost:3000` (default).
 
 | Role | URL | Deskripsi |
 |------|-----|-----------|
-| Customer | `http://localhost:3000/customer.html?table=table-1` | Scan QR meja, pilih menu, pesan, minta bill, bayar |
+| Customer | Scan QR code meja | Pilih menu, pesan, minta bill, bayar |
 | Kitchen | `http://localhost:3000/kitchen.html` | Lihat pesanan masuk, update status (pending → preparing → ready → completed), notifikasi audio |
 | Admin | `http://localhost:3000/admin.html` | Dashboard meja, monitor pesanan real-time, lihat QR code per meja, revenue tracking |
 
@@ -164,6 +164,8 @@ cd ../admin && npm run lint
 | DB_PATH | ./server/izakaya.db | Path SQLite database |
 | VITE_SOCKET_URL | http://localhost:3000 | Socket.io server URL (client) |
 | VITE_API_URL | http://localhost:3000 | REST API base URL (client) |
+| ADMIN_TOKEN | - | Token rahasia untuk akses admin, wajib diisi |
+| KITCHEN_TOKEN | - | Token rahasia untuk akses kitchen, wajib diisi |
 
 ## Fitur Utama
 
