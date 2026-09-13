@@ -408,7 +408,8 @@ app.get('/admin.html', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, async () => {
+
+async function startServer() {
   const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
   const tables = s.getAllTables.all();
   for (const table of tables) {
@@ -417,9 +418,69 @@ server.listen(PORT, async () => {
     const qrCode = await QRCode.toDataURL(url);
     s.updateTableQrCode.run(qrCode, table.id);
   }
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log('Customer: scan the table QR code to open the ordering page');
-  console.log(`Kitchen: http://localhost:${PORT}/kitchen.html`);
-  console.log(`Admin: http://localhost:${PORT}/admin.html`);
-  console.log(`Health: http://localhost:${PORT}/health`);
+  server.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+    console.log('Customer: scan the table QR code to open the ordering page');
+    console.log(`Kitchen: http://localhost:${PORT}/kitchen.html`);
+    console.log(`Admin: http://localhost:${PORT}/admin.html`);
+    console.log(`Health: http://localhost:${PORT}/health`);
+  });
+}
+
+function shutdown(signal) {
+  console.log(`\nReceived ${signal}. Starting graceful shutdown...`);
+
+  // Stop accepting new connections
+  server.close(() => {
+    console.log('HTTP server closed');
+
+    // Close all socket.io connections
+    io.close(() => {
+      console.log('Socket.io connections closed');
+
+      // Close database
+      try {
+        const db = require('./db');
+        if (db && db.default && typeof db.default.close === 'function') {
+          db.default.close();
+        } else if (db && typeof db.close === 'function') {
+          db.close();
+        }
+        console.log('Database connection closed');
+      } catch (e) {
+        console.error('Error closing database:', e.message);
+      }
+
+      console.log('Graceful shutdown complete');
+      process.exit(0);
+    });
+
+    // Force close after 10s if sockets don't close
+    setTimeout(() => {
+      console.error('Force closing after timeout');
+      process.exit(1);
+    }, 10000);
+  });
+
+  // If server.close takes too long, force exit
+  setTimeout(() => {
+    console.error('Server close timeout, forcing exit');
+    process.exit(1);
+  }, 15000);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+  shutdown('uncaughtException');
 });
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
+  shutdown('unhandledRejection');
+});
+
+startServer();

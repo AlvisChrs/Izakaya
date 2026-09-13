@@ -158,4 +158,5 @@ module.exports = {
   getTableWithOrders,
   getAllPendingOrdersWithTable,
   getStatements,
+  close: () => db.close(),
 };
