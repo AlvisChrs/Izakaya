@@ -5,7 +5,8 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "node server/index.js"
+    "dev": "node server/index.js",
+    "build:all": "node build.js"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
