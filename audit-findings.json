@@ -1,0 +1,99 @@
+{
+  "timestamp": "2026-09-07T01:33:44.384Z",
+  "findings": [
+    {
+      "severity": "High",
+      "category": "Config",
+      "title": "Missing build script",
+      "file": "package.json",
+      "line": 0,
+      "remediation": "Add \"build\" script to package.json"
+    },
+    {
+      "severity": "Medium",
+      "category": "Config",
+      "title": "Missing test script",
+      "file": "package.json",
+      "line": 0,
+      "remediation": "Add \"test\" script to package.json"
+    },
+    {
+      "severity": "Low",
+      "category": "Config",
+      "title": "Missing lint script",
+      "file": "package.json",
+      "line": 0,
+      "remediation": "Add \"lint\" script to package.json"
+    },
+    {
+      "severity": "Low",
+      "category": "Config",
+      "title": "Missing engines.node field",
+      "file": "package.json",
+      "line": 0,
+      "remediation": "Add \"engines\": { \"node\": \">=18\" }"
+    },
+    {
+      "severity": "High",
+      "category": "Config",
+      "title": "Missing .env.example",
+      "file": ".env.example",
+      "line": 0,
+      "remediation": "Create .env.example with all required environment variables documented"
+    },
+    {
+      "severity": "Medium",
+      "category": "Infra",
+      "title": "No Dockerfile found",
+      "file": "Dockerfile",
+      "line": 0,
+      "remediation": "Add Dockerfile for containerized deployment"
+    },
+    {
+      "severity": "Low",
+      "category": "Infra",
+      "title": "No docker-compose.yml found",
+      "file": "docker-compose.yml",
+      "line": 0,
+      "remediation": "Add docker-compose.yml for local multi-service dev"
+    },
+    {
+      "severity": "Medium",
+      "category": "CI/CD",
+      "title": "No GitHub Actions workflows",
+      "file": ".github/workflows/",
+      "line": 0,
+      "remediation": "Add CI workflow with lint, typecheck, test, build"
+    },
+    {
+      "severity": "High",
+      "category": "Docs",
+      "title": "Missing README.md",
+      "file": "README.md",
+      "line": 0,
+      "remediation": "Create README with install, run, deploy instructions"
+    },
+    {
+      "severity": "Critical",
+      "category": "Build",
+      "title": "npm ci failed",
+      "file": "package.json",
+      "line": 0,
+      "remediation": "Fix dependency installation: Command failed: npm ci\nnpm error code EPERM\nnpm error syscall unlink\nnpm error path C:\\Users\\LENOVO\\Documents\\Project and University things\\Izakaya\\node_modules\\better-sqlite3\\prebuilds\\win32-x64.node"
+    },
+    {
+      "severity": "Critical",
+      "category": "Build",
+      "title": "npm run build failed",
+      "file": "package.json",
+      "line": 0,
+      "remediation": "Fix build: Command failed: npm run build\nnpm error Missing script: \"build\"\nnpm error\nnpm error To see a list of scripts, run:\nnpm error   npm run\nnpm error A complete log of this run can be found in: C:\\Users\\LE"
+    }
+  ],
+  "summary": {
+    "Critical": 2,
+    "High": 3,
+    "Medium": 3,
+    "Low": 3
+  }
+}

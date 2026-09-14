@@ -20,6 +20,8 @@ function App() {
   const [activeWaiterRequest, setActiveWaiterRequest] = useState(null)
   const [socket, setSocket] = useState(null)
   const [connected, setConnected] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState(null)
+  const [cashRequested, setCashRequested] = useState(false)
 
   // Get tableId from URL
   useEffect(() => {
@@ -70,7 +72,13 @@ function App() {
     newSocket.on('payment-confirmed', () => {
       setShowBill(false)
       setBill(null)
+      setPaymentMethod(null)
+      setCashRequested(false)
       setOrders(prev => prev.map(o => ({ ...o, status: 'completed' })))
+    })
+
+    newSocket.on('cash-payment-requested', () => {
+      setCashRequested(true)
     })
 
     newSocket.on('menu-updated', (data) => {
@@ -137,9 +145,12 @@ function App() {
     socket.emit('request-bill', tableId)
   }
 
-  const payBill = () => {
+  const payBill = (method) => {
     if (!socket) return
-    socket.emit('pay-bill', tableId)
+    socket.emit('pay-bill', { tableId, paymentMethod: method })
+    if (method === 'cash') {
+      setPaymentMethod('cash')
+    }
   }
 
   const getStatusColor = (status) => {
@@ -318,9 +329,21 @@ function App() {
 
             {/* Bill Modal */}
             {showBill && bill && (
-              <div className="bill-modal-overlay" onClick={() => setShowBill(false)}>
+              <div className="bill-modal-overlay" onClick={() => {
+                setShowBill(false);
+                setPaymentMethod(null);
+                setCashRequested(false);
+              }}>
                 <div className="bill-modal" onClick={e => e.stopPropagation()}>
-                  <h2>🧾 Bill - Meja {bill.tableNumber}</h2>
+                  <div className="bill-modal-header">
+                    <h2>🧾 Bill - Meja {bill.tableNumber}</h2>
+                    <button className="close-btn" onClick={() => {
+                      setShowBill(false);
+                      setPaymentMethod(null);
+                      setCashRequested(false);
+                    }}>✕</button>
+                  </div>
+                  
                   <div className="bill-items">
                     {bill.items.map((item, i) => (
                       <div key={i} className="bill-item">
@@ -334,7 +357,48 @@ function App() {
                     <div><span>PPN 11%</span><span>Rp {bill.tax.toLocaleString('id-ID')}</span></div>
                     <div className="bill-total"><span>Total</span><span>Rp {bill.total.toLocaleString('id-ID')}</span></div>
                   </div>
-                  <button className="pay-btn" onClick={payBill}>Bayar Sekarang</button>
+                  
+                  <div className="payment-section">
+                    {!paymentMethod ? (
+                      <div className="payment-methods">
+                        <h3>Pilih Metode Pembayaran</h3>
+                        <div className="payment-options-grid">
+                          <button className="qris-btn" onClick={() => setPaymentMethod('qris')}>
+                            📱 Bayar pakai QRIS
+                          </button>
+                          <button className="cash-btn" onClick={() => payBill('cash')}>
+                            💵 Bayar Tunai (Panggil Kasir)
+                          </button>
+                        </div>
+                      </div>
+                    ) : paymentMethod === 'qris' ? (
+                      <div className="qris-simulation">
+                        <h3>Scan QRIS berikut</h3>
+                        <div className="qris-placeholder">
+                          {/* Fake QRIS representation */}
+                          <div className="qris-box">
+                            <span className="qris-logo">QRIS</span>
+                            <div className="qr-fake-pattern"></div>
+                          </div>
+                        </div>
+                        <p>Total: <strong>Rp {bill.total.toLocaleString('id-ID')}</strong></p>
+                        <button className="simulasi-btn" onClick={() => payBill('qris')}>
+                          Simulasikan Pembayaran Berhasil
+                        </button>
+                        <button className="kembali-btn" onClick={() => setPaymentMethod(null)}>Batal / Kembali</button>
+                      </div>
+                    ) : (
+                      <div className="cash-simulation">
+                        <h3>Bayar Tunai</h3>
+                        <div className="waiter-pulse" style={{ fontSize: '3rem', textAlign: 'center', margin: '20px 0' }}>💵</div>
+                        {cashRequested ? (
+                          <p><strong>Kasir sedang menuju ke meja Anda.</strong><br/>Silakan siapkan uang tunai sebesar <strong>Rp {bill.total.toLocaleString('id-ID')}</strong>.</p>
+                        ) : (
+                          <p>Memanggil kasir...</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

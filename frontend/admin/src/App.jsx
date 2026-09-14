@@ -90,6 +90,7 @@ function App() {
     description: ''
   });
   const [customCategory, setCustomCategory] = useState('');
+  const [adminBillData, setAdminBillData] = useState(null);
 
   // Audio chime for waiter call
   const playChimeSound = () => {
@@ -183,6 +184,14 @@ function App() {
       setCategories(data.categories);
     });
 
+    newSocket.on('admin-bill-data', (data) => {
+      setAdminBillData(data);
+    });
+
+    newSocket.on('payment-confirmed', () => {
+      setAdminBillData(null);
+    });
+
     newSocket.on('waiter-requests-updated', (requests) => {
       setWaiterRequests(requests);
     });
@@ -211,6 +220,21 @@ function App() {
     setCategories([]);
     setOrders([]);
     setWaiterRequests([]);
+    setAdminBillData(null);
+  };
+
+  const handleRequestAdminBill = (tableId) => {
+    if (!socket || !adminToken) return;
+    socket.emit('admin-request-bill', tableId);
+  };
+
+  const handleConfirmAdminPayment = (tableId) => {
+    if (!socket || !adminToken) return;
+    socket.emit('admin-confirm-payment', tableId);
+  };
+
+  const handlePrintReceipt = () => {
+    window.print();
   };
 
   const handleResolveWaiterRequest = (requestId) => {
@@ -467,6 +491,11 @@ function App() {
                   )}
 
                   <div className="table-actions">
+                    {tableOrders.length > 0 && (
+                      <button className="billing-btn" onClick={() => handleRequestAdminBill(table.id)}>
+                        💳 Pembayaran
+                      </button>
+                    )}
                     <a
                       href={`${window.location.origin}/customer.html?table=${table.id}`}
                       target="_blank"
@@ -638,6 +667,91 @@ function App() {
               )}
               <p className="qr-hint">Scan untuk membuka menu customer</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Bill & Receipt Modal */}
+      {adminBillData && (
+        <div className="modal-overlay no-print" onClick={() => setAdminBillData(null)}>
+          <div className="modal admin-bill-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>💳 Pembayaran Meja {adminBillData.bill.tableNumber}</h2>
+              <button className="close-btn" onClick={() => setAdminBillData(null)}>✕</button>
+            </div>
+            
+            <div className="admin-bill-content">
+              {adminBillData.bill.items.length === 0 ? (
+                <p>Belum ada pesanan yang Selesai (Completed) untuk dibayar.</p>
+              ) : (
+                <>
+                  <div className="bill-items">
+                    {adminBillData.bill.items.map((item, i) => (
+                      <div key={i} className="bill-item">
+                        <span>{item.name} x{item.quantity}</span>
+                        <span>Rp {(item.price * item.quantity).toLocaleString('id-ID')}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="bill-summary">
+                    <div><span>Subtotal</span><span>Rp {adminBillData.bill.subtotal.toLocaleString('id-ID')}</span></div>
+                    <div><span>PPN 11%</span><span>Rp {adminBillData.bill.tax.toLocaleString('id-ID')}</span></div>
+                    <div className="bill-total"><span>Total</span><span>Rp {adminBillData.bill.total.toLocaleString('id-ID')}</span></div>
+                  </div>
+                  
+                  <div className="admin-bill-actions">
+                    <button className="print-btn" onClick={handlePrintReceipt}>
+                      🖨️ Cetak Struk
+                    </button>
+                    <button className="confirm-pay-btn" onClick={() => handleConfirmAdminPayment(adminBillData.tableId)}>
+                      ✅ Tandai Lunas
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Print-only receipt layout */}
+      {adminBillData && (
+        <div className="print-receipt-layout print-only">
+          <div className="receipt-header">
+            <h2>🏮 Izakaya</h2>
+            <p>Meja {adminBillData.bill.tableNumber}</p>
+            <p>{new Date().toLocaleString('id-ID')}</p>
+          </div>
+          <div className="receipt-divider">--------------------------------</div>
+          <div className="receipt-items">
+            {adminBillData.bill.items.map((item, i) => (
+              <div key={i} className="receipt-item">
+                <div>{item.name}</div>
+                <div className="receipt-item-row">
+                  <span>{item.quantity} x Rp {item.price.toLocaleString('id-ID')}</span>
+                  <span>Rp {(item.price * item.quantity).toLocaleString('id-ID')}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="receipt-divider">--------------------------------</div>
+          <div className="receipt-summary">
+            <div className="receipt-row">
+              <span>Subtotal</span>
+              <span>Rp {adminBillData.bill.subtotal.toLocaleString('id-ID')}</span>
+            </div>
+            <div className="receipt-row">
+              <span>PPN 11%</span>
+              <span>Rp {adminBillData.bill.tax.toLocaleString('id-ID')}</span>
+            </div>
+            <div className="receipt-row receipt-total">
+              <span>TOTAL</span>
+              <span>Rp {adminBillData.bill.total.toLocaleString('id-ID')}</span>
+            </div>
+          </div>
+          <div className="receipt-divider">================================</div>
+          <div className="receipt-footer">
+            <p>Terima kasih atas kunjungan Anda!</p>
           </div>
         </div>
       )}

@@ -254,16 +254,75 @@ io.on('connection', (socket) => {
     console.log(`Bill generated for table ${table.number}`);
   });
 
-  // Customer pays (marks orders as completed)
-  socket.on('pay-bill', (tableId) => {
+  // Customer pays or requests cash payment
+  socket.on('pay-bill', ({ tableId, paymentMethod }) => {
     if (!validate.tableId(tableId) || !requireTableSession(tableId)) return;
+    const table = s.getTable.get(tableId);
+    if (!table) return;
+
+    if (paymentMethod === 'cash') {
+      activeWaiterRequests = activeWaiterRequests.filter(r => r.tableId !== tableId);
+      const request = {
+        id: uuidv4(),
+        tableId,
+        tableNumber: table.number,
+        requestType: 'Kasir ke meja (Bayar Tunai)',
+        timestamp: Date.now(),
+        socketId: socket.id
+      };
+      activeWaiterRequests.push(request);
+      io.to('kitchen').emit('waiter-called', request);
+      io.to('kitchen').emit('waiter-requests-updated', activeWaiterRequests);
+      io.to(`table-${tableId}`).emit('waiter-request-active', request);
+      io.to(`table-${tableId}`).emit('cash-payment-requested');
+      console.log(`Cash payment requested by Table ${table.number}`);
+    } else if (paymentMethod === 'qris') {
+      s.markTableOrdersCompleted.run(tableId);
+      io.to(`table-${tableId}`).emit('payment-confirmed');
+      io.to('kitchen').emit('orders-completed', { tableId, tableNumber: table.number });
+      console.log(`QRIS Payment confirmed for table ${table.number}`);
+    }
+  });
+
+  // Admin requests bill for printing
+  socket.on('admin-request-bill', (tableId) => {
+    if (socket.data.staffRole !== 'admin' && socket.data.staffRole !== 'kitchen') {
+      socket.emit('error', { message: 'Unauthorized: Staff token required' });
+      return;
+    }
+    if (!validate.tableId(tableId)) return;
+    const table = db.getTableWithOrders(tableId);
+    if (!table) return;
+
+    const completedOrders = table.orders.filter(o => o.status === 'completed');
+    const bill = {
+      tableNumber: table.number,
+      items: completedOrders.flatMap(o => o.items),
+      subtotal: completedOrders.reduce((sum, o) => sum + o.total, 0),
+      tax: 0,
+      total: completedOrders.reduce((sum, o) => sum + o.total, 0),
+      timestamp: Date.now()
+    };
+    bill.tax = Math.round(bill.subtotal * 0.11);
+    bill.total = bill.subtotal + bill.tax;
+
+    socket.emit('admin-bill-data', { tableId, bill });
+  });
+
+  // Admin manually confirms payment
+  socket.on('admin-confirm-payment', (tableId) => {
+    if (socket.data.staffRole !== 'admin' && socket.data.staffRole !== 'kitchen') {
+      socket.emit('error', { message: 'Unauthorized: Staff token required' });
+      return;
+    }
+    if (!validate.tableId(tableId)) return;
     const table = s.getTable.get(tableId);
     if (!table) return;
 
     s.markTableOrdersCompleted.run(tableId);
     io.to(`table-${tableId}`).emit('payment-confirmed');
     io.to('kitchen').emit('orders-completed', { tableId, tableNumber: table.number });
-    console.log(`Payment confirmed for table ${table.number}`);
+    console.log(`Manual Payment confirmed by Admin for table ${table.number}`);
   });
 
   socket.on('disconnect', () => {
