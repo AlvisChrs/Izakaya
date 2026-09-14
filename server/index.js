@@ -21,6 +21,35 @@ const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
+// Setup logging
+const fs = require('fs');
+const morgan = require('morgan');
+const winston = require('winston');
+const logDir = path.join(__dirname, 'logs');
+if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
+
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.File({ filename: path.join(logDir, 'error.log'), level: 'error' }),
+    new winston.transports.File({ filename: path.join(logDir, 'combined.log') }),
+    new winston.transports.Console({ format: winston.format.simple() })
+  ],
+});
+
+// Override console to also log to file
+const originalLog = console.log;
+const originalError = console.error;
+console.log = (...args) => { originalLog(...args); logger.info(args.join(' ')); };
+console.error = (...args) => { originalError(...args); logger.error(args.join(' ')); };
+
+// Request logging middleware
+app.use(morgan('short', { stream: { write: message => logger.info(message.trim()) } }));
+
 io.use((socket, next) => {
   const handshakeToken = socket.handshake.auth?.token || socket.handshake.query?.token;
   socket.data.staffRole = auth.getStaffRole(handshakeToken);
