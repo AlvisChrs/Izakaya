@@ -25,6 +25,7 @@ const io = new Server(server, {
 const fs = require('fs');
 const morgan = require('morgan');
 const winston = require('winston');
+const cron = require('node-cron');
 const logDir = path.join(__dirname, 'logs');
 if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
 
@@ -49,6 +50,24 @@ console.error = (...args) => { originalError(...args); logger.error(args.join(' 
 
 // Request logging middleware
 app.use(morgan('short', { stream: { write: message => logger.info(message.trim()) } }));
+
+// Daily Database Backup
+const backupDir = path.join(__dirname, 'backups');
+if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir);
+
+cron.schedule('0 0 * * *', () => {
+  const dateStr = new Date().toISOString().split('T')[0];
+  const dbPath = path.join(__dirname, 'izakaya.db');
+  const backupPath = path.join(backupDir, `izakaya-${dateStr}.db`);
+  try {
+    if (fs.existsSync(dbPath)) {
+      fs.copyFileSync(dbPath, backupPath);
+      logger.info(`Database backup created successfully: izakaya-${dateStr}.db`);
+    }
+  } catch (err) {
+    logger.error(`Database backup failed: ${err.message}`);
+  }
+});
 
 io.use((socket, next) => {
   const handshakeToken = socket.handshake.auth?.token || socket.handshake.query?.token;
