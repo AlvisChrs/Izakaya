@@ -6,6 +6,7 @@ const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 const QRCode = require('qrcode');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 
 const db = require('./db');
 const { validate } = require('./validation');
@@ -30,8 +31,18 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
+// API rate limiter
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 150, // limit each IP to 150 requests per windowMs
+  message: { error: 'Terlalu banyak permintaan, coba lagi nanti.' }
+});
+app.use('/api/', apiLimiter);
+
 // Memory store for active waiter calls
 let activeWaiterRequests = [];
+// Cooldown map for call-waiter to prevent spam
+const callWaiterCooldown = new Map();
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
@@ -92,6 +103,14 @@ io.on('connection', (socket) => {
       socket.emit('error', { message: 'Permintaan panggil pelayan tidak valid' });
       return;
     }
+
+    const now = Date.now();
+    const lastCall = callWaiterCooldown.get(tableId) || 0;
+    if (now - lastCall < 15000) { // 15 seconds cooldown
+      socket.emit('error', { message: 'Terlalu banyak panggilan, mohon tunggu sebentar.' });
+      return;
+    }
+    callWaiterCooldown.set(tableId, now);
 
     const table = s.getTable.get(tableId);
     if (!table) return;
