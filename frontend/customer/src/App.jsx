@@ -184,7 +184,7 @@ function App() {
         <h1>🏮 Izakaya</h1>
         <div className="header-actions">
           <button className="call-waiter-header-btn" onClick={() => setShowWaiterModal(true)}>
-            🛎️ Panggil Pelayan
+            🛎️ <span>Panggil Pelayan</span>
           </button>
           <div className="table-info">
             <span>Meja {table?.number || tableId}</span>
