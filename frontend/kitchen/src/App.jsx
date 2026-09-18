@@ -125,6 +125,7 @@ function App() {
 
     newSocket.on('kitchen-orders', (orderList) => {
       setOrders(orderList)
+      setLoading(false)
       if (orderList.length > 0 && soundEnabled) playNotification()
     })
 
