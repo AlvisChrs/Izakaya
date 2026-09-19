@@ -1,12 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { io } from 'socket.io-client'
 import './App.css'
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin
 
 function App() {
-  const [tableId, setTableId] = useState(null)
-  const [tableAccessToken, setTableAccessToken] = useState(null)
+  const [tableId] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('table') || 'table-1'
+  })
+  const [tableAccessToken] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('access')
+  })
   const [table, setTable] = useState(null)
   const [menu, setMenu] = useState([])
   const [categories, setCategories] = useState([])
@@ -18,26 +24,17 @@ function App() {
   const [bill, setBill] = useState(null)
   const [showWaiterModal, setShowWaiterModal] = useState(false)
   const [activeWaiterRequest, setActiveWaiterRequest] = useState(null)
-  const [socket, setSocket] = useState(null)
+  const socketRef = useRef(null)
   const [connected, setConnected] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState(null)
   const [cashRequested, setCashRequested] = useState(false)
-
-  // Get tableId from URL
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const tId = params.get('table') || 'table-1'
-    const accessToken = params.get('access')
-    setTableId(tId)
-    setTableAccessToken(accessToken)
-  }, [])
 
   // Initialize socket
   useEffect(() => {
     if (!tableId) return
 
     const newSocket = io(SOCKET_URL, { transports: ['websocket', 'polling'] })
-    setSocket(newSocket)
+    socketRef.current = newSocket
 
     newSocket.on('connect', () => {
       setConnected(true)
@@ -105,13 +102,13 @@ function App() {
   }, [tableId, tableAccessToken])
 
   const handleCallWaiter = (requestType) => {
-    if (!socket || !tableId) return
-    socket.emit('call-waiter', { tableId, requestType })
+    if (!socketRef.current || !tableId) return
+    socketRef.current.emit('call-waiter', { tableId, requestType })
   }
 
   const handleCancelWaiterCall = () => {
-    if (!socket || !tableId) return
-    socket.emit('cancel-waiter-request', tableId)
+    if (!socketRef.current || !tableId) return
+    socketRef.current.emit('cancel-waiter-request', tableId)
   }
 
   const addToCart = (item) => {
@@ -136,18 +133,18 @@ function App() {
   }
 
   const placeOrder = () => {
-    if (cart.length === 0 || !socket) return
-    socket.emit('place-order', { tableId, items: cart, notes })
+    if (cart.length === 0 || !socketRef.current) return
+    socketRef.current.emit('place-order', { tableId, items: cart, notes })
   }
 
   const requestBill = () => {
-    if (!socket) return
-    socket.emit('request-bill', tableId)
+    if (!socketRef.current) return
+    socketRef.current.emit('request-bill', tableId)
   }
 
   const payBill = (method) => {
-    if (!socket) return
-    socket.emit('pay-bill', { tableId, paymentMethod: method })
+    if (!socketRef.current) return
+    socketRef.current.emit('pay-bill', { tableId, paymentMethod: method })
     if (method === 'cash') {
       setPaymentMethod('cash')
     }
