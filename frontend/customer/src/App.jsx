@@ -224,7 +224,11 @@ function App() {
             {filteredMenu.map(item => (
               <div key={item.id} className={`menu-item ${item.available === 0 ? 'out-of-stock' : ''}`}>
                 <div className="item-info">
-                  <span className="item-emoji">{item.image}</span>
+                  {item.image && (item.image.startsWith('http') || item.image.startsWith('/uploads')) ? (
+                    <img src={item.image} alt={item.name} className="item-image-preview" />
+                  ) : (
+                    <span className="item-emoji">{item.image}</span>
+                  )}
                   <div>
                     <h4>
                       {item.name}

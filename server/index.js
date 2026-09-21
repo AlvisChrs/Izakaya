@@ -11,6 +11,7 @@ const rateLimit = require('express-rate-limit');
 const db = require('./db');
 const { validate } = require('./validation');
 const auth = require('./auth');
+const multer = require('multer');
 
 db.init();
 const s = db.getStatements();
@@ -78,6 +79,32 @@ io.use((socket, next) => {
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
+
+// Configure Multer for image uploads
+const uploadDir = path.join(__dirname, '../public/uploads');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Hanya file gambar yang diizinkan!'));
+    }
+  }
+});
 
 // API rate limiter
 const apiLimiter = rateLimit({
@@ -405,6 +432,20 @@ function broadcastMenuUpdated() {
 }
 
 // REST endpoints
+// Admin: Upload Image
+app.post('/api/upload', auth.requireAdmin, (req, res, next) => {
+  upload.single('image')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}, (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Tidak ada file yang diunggah' });
+  }
+  const fileUrl = `/uploads/${req.file.filename}`;
+  res.json({ url: fileUrl });
+});
+
 app.get('/api/menu', auth.requireAdmin, (req, res) => {
   const menu = s.getAllMenu.all();
   const categories = s.getMenuCategories.all().map(c => c.category);
@@ -609,4 +650,8 @@ process.on('unhandledRejection', (reason) => {
   shutdown('unhandledRejection');
 });
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = { app, server, io };

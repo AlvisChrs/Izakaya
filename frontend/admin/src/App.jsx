@@ -89,6 +89,7 @@ function App() {
     image: '🍱',
     description: ''
   });
+  const [imageFile, setImageFile] = useState(null);
   const [customCategory, setCustomCategory] = useState('');
   const [adminBillData, setAdminBillData] = useState(null);
 
@@ -258,6 +259,7 @@ function App() {
       description: ''
     });
     setCustomCategory('');
+    setImageFile(null);
     setShowMenuModal(true);
   };
 
@@ -271,6 +273,7 @@ function App() {
       description: item.description || ''
     });
     setCustomCategory('');
+    setImageFile(null);
     setShowMenuModal(true);
   };
 
@@ -311,11 +314,33 @@ function App() {
       return;
     }
 
+    let finalImageUrl = menuForm.image.trim() || '🍱';
+    if (imageFile) {
+      const formData = new FormData();
+      formData.append('image', imageFile);
+      try {
+        const uploadRes = await fetch(`${API_URL}/api/upload`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${adminToken}` },
+          body: formData
+        });
+        if (!uploadRes.ok) {
+          const errData = await uploadRes.json();
+          throw new Error(errData.error || 'Gagal mengupload gambar');
+        }
+        const uploadData = await uploadRes.json();
+        finalImageUrl = API_URL + uploadData.url;
+      } catch (err) {
+        alert(err.message);
+        return;
+      }
+    }
+
     const payload = {
       name: menuForm.name.trim(),
       price: Number(menuForm.price),
       category: targetCategory,
-      image: menuForm.image.trim() || '🍱',
+      image: finalImageUrl,
       description: menuForm.description.trim()
     };
 
@@ -526,7 +551,11 @@ function App() {
                 <h3>{cat}</h3>
                 {menu.filter(m => m.category === cat).map(item => (
                   <div key={item.id} className={`menu-item-admin ${item.available === 0 ? 'out-of-stock-item' : ''}`}>
-                    <span className="item-emoji">{item.image}</span>
+                    {item.image && (item.image.startsWith('http') || item.image.startsWith('/uploads')) ? (
+                      <img src={item.image} alt={item.name} className="item-image-preview" />
+                    ) : (
+                      <span className="item-emoji">{item.image}</span>
+                    )}
                     <div className="item-details">
                       <div className="item-title-row">
                         <span className="item-name">{item.name}</span>
@@ -619,12 +648,23 @@ function App() {
               )}
 
               <div className="form-group">
-                <label>Emoji / Ikon</label>
+                <label>Gambar Menu (Upload)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={e => {
+                    if (e.target.files && e.target.files[0]) {
+                      setImageFile(e.target.files[0]);
+                    }
+                  }}
+                />
+                <small>Atau masukkan teks/emoji jika tidak ada gambar:</small>
                 <input
                   type="text"
                   placeholder="Misal: 🍜, 🍣, 🍱"
                   value={menuForm.image}
                   onChange={e => setMenuForm({ ...menuForm, image: e.target.value })}
+                  disabled={!!imageFile}
                 />
               </div>
 
