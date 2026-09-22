@@ -1,6 +1,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const bcrypt = require('bcryptjs');
 
 const dbPath = process.env.DB_PATH || path.join(__dirname, 'izakaya.db');
 const db = new Database(dbPath);
@@ -41,6 +42,13 @@ function init() {
 
     CREATE INDEX IF NOT EXISTS idx_orders_table_status ON orders(table_id, status);
     CREATE INDEX IF NOT EXISTS idx_orders_timestamp ON orders(timestamp);
+
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL
+    );
   `);
 
   // Column migration for existing DB
@@ -98,6 +106,16 @@ function init() {
     });
     insertMany(defaultMenu);
   }
+
+  // Seed users if empty
+  const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get().c;
+  if (userCount === 0) {
+    const insertUser = db.prepare('INSERT INTO users (id, username, password_hash, role) VALUES (?, ?, ?, ?)');
+    const adminHash = bcrypt.hashSync('admin123', 10);
+    const kitchenHash = bcrypt.hashSync('kitchen123', 10);
+    insertUser.run('u1', 'admin', adminHash, 'admin');
+    insertUser.run('u2', 'kitchen', kitchenHash, 'kitchen');
+  }
 }
 
 // Prepared statements (created after init)
@@ -128,6 +146,8 @@ function getStatements() {
       getOrderById: db.prepare('SELECT * FROM orders WHERE id = ?'),
       updateOrderStatus: db.prepare('UPDATE orders SET status = ? WHERE id = ?'),
       markTableOrdersCompleted: db.prepare("UPDATE orders SET status = 'completed' WHERE table_id = ? AND status != 'completed'"),
+      // Users
+      getUserByUsername: db.prepare('SELECT * FROM users WHERE username = ?'),
     };
   }
   return statements;

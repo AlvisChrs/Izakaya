@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import './App.css';
 
@@ -8,7 +8,8 @@ const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
 const ADMIN_TOKEN_KEY = 'izakaya_admin_token';
 
 function LoginPage({ onLogin }) {
-  const [token, setToken] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -18,16 +19,22 @@ function LoginPage({ onLogin }) {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_URL}/api/menu`, {
-        headers: { 'Authorization': `Bearer ${token.trim()}` }
+      const res = await fetch(`${API_URL}/api/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
       });
-      if (res.ok) {
-        localStorage.setItem(ADMIN_TOKEN_KEY, token.trim());
-        onLogin(token.trim());
+      
+      const data = await res.json();
+      
+      if (res.ok && data.role === 'admin') {
+        localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
+        onLogin(data.token);
       } else {
-        setError('Token admin tidak valid');
+        setError(data.error || 'Akses ditolak: Anda bukan admin');
       }
     } catch (err) {
+      console.error(err);
       setError('Gagal menghubungi server');
     } finally {
       setLoading(false);
@@ -39,29 +46,37 @@ function LoginPage({ onLogin }) {
       <div className="login-card">
         <div className="login-header">
           <h1>📊 Admin Izakaya</h1>
-          <p>Masukkan token admin untuk mengakses panel</p>
+          <p>Login ke Panel Admin</p>
         </div>
         <form onSubmit={handleSubmit} className="login-form">
           {error && <div className="login-error">{error}</div>}
           <div className="form-group">
-            <label htmlFor="token">Admin Token</label>
+            <label htmlFor="username">Username</label>
             <input
-              id="token"
-              type="password"
-              placeholder="Masukkan admin token"
-              value={token}
-              onChange={e => setToken(e.target.value)}
+              id="username"
+              type="text"
+              placeholder="Misal: admin"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
               required
               autoFocus
             />
           </div>
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              placeholder="Masukkan password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+            />
+          </div>
           <button type="submit" className="login-btn" disabled={loading}>
-            {loading ? 'Memverifikasi...' : 'Masuk'}
+            {loading ? 'Masuk...' : 'Masuk'}
           </button>
         </form>
-        <div className="login-hint">
-          <small>Gunakan token yang dikonfigurasi oleh administrator server.</small>
-        </div>
       </div>
     </div>
   );
@@ -79,7 +94,7 @@ function App() {
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [adminToken, setAdminToken] = useState(null);
+  const [adminToken, setAdminToken] = useState(() => localStorage.getItem(ADMIN_TOKEN_KEY));
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [editingMenu, setEditingMenu] = useState(null);
   const [menuForm, setMenuForm] = useState({
@@ -107,15 +122,22 @@ function App() {
       gain.gain.setValueAtTime(0.15, ctx.currentTime);
       osc.start();
       setTimeout(() => { osc.stop(); ctx.close() }, 400);
-    } catch (e) {}
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  // Check for stored token on mount
-  useEffect(() => {
-    const stored = localStorage.getItem(ADMIN_TOKEN_KEY);
-    if (stored) {
-      setAdminToken(stored);
-    }
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem(ADMIN_TOKEN_KEY);
+    setAdminToken(null);
+    setSocket(null);
+    setConnected(false);
+    setTables([]);
+    setMenu([]);
+    setCategories([]);
+    setOrders([]);
+    setWaiterRequests([]);
+    setAdminBillData(null);
   }, []);
 
   // Fetch initial data via REST (requires admin token)
@@ -155,6 +177,7 @@ function App() {
       transports: ['websocket', 'polling'],
       auth: { token: adminToken }
     });
+    // eslint-disable-next-line react/set-state-in-effect
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
@@ -209,20 +232,7 @@ function App() {
     });
 
     return () => newSocket.close();
-  }, [adminToken]);
-
-  const handleLogout = () => {
-    localStorage.removeItem(ADMIN_TOKEN_KEY);
-    setAdminToken(null);
-    setSocket(null);
-    setConnected(false);
-    setTables([]);
-    setMenu([]);
-    setCategories([]);
-    setOrders([]);
-    setWaiterRequests([]);
-    setAdminBillData(null);
-  };
+  }, [adminToken, handleLogout]);
 
   const handleRequestAdminBill = (tableId) => {
     if (!socket || !adminToken) return;

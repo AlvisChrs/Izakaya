@@ -5,4 +5,4 @@ node_modules/
 server/*.db
 server/*.db-journal
 server/*.db-wal
-server/*.db-shm
+server/*.db-shmserver/backups/

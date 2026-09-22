@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { io } from 'socket.io-client'
 import './App.css'
 
@@ -6,7 +6,8 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin
 const KITCHEN_TOKEN_KEY = 'izakaya_kitchen_token'
 
 function LoginPage({ onLogin }) {
-  const [token, setToken] = useState('')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -16,40 +17,23 @@ function LoginPage({ onLogin }) {
     setLoading(true)
 
     try {
-      // Test the token by connecting to socket
-      const { io } = await import('socket.io-client')
-      const testSocket = io(SOCKET_URL, {
-        transports: ['websocket', 'polling'],
-        auth: { token: token.trim() }
+      const res = await fetch(`${import.meta.env.VITE_API_URL || window.location.origin}/api/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
       })
-
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Timeout')), 5000)
-        testSocket.on('connect', () => {
-          clearTimeout(timeout)
-          // Try to join kitchen to validate token
-          testSocket.emit('join-kitchen')
-        })
-        testSocket.on('error', ({ message }) => {
-          clearTimeout(timeout)
-          testSocket.close()
-          if (message.includes('Unauthorized')) {
-            reject(new Error('Token kitchen tidak valid'))
-          } else {
-            reject(new Error(message))
-          }
-        })
-        testSocket.on('kitchen-orders', () => {
-          clearTimeout(timeout)
-          testSocket.close()
-          resolve()
-        })
-      })
-
-      localStorage.setItem(KITCHEN_TOKEN_KEY, token.trim())
-      onLogin(token.trim())
+      
+      const data = await res.json()
+      
+      if (res.ok && data.role === 'kitchen') {
+        localStorage.setItem(KITCHEN_TOKEN_KEY, data.token)
+        onLogin(data.token)
+      } else {
+        setError(data.error || 'Akses ditolak: Anda bukan staff dapur')
+      }
     } catch (err) {
-      setError(err.message || 'Gagal menghubungi server')
+      console.error(err)
+      setError('Gagal menghubungi server')
     } finally {
       setLoading(false)
     }
@@ -60,29 +44,37 @@ function LoginPage({ onLogin }) {
       <div className="login-card">
         <div className="login-header">
           <h1>🍳 Dapur Izakaya</h1>
-          <p>Masukkan token kitchen untuk mengakses panel</p>
+          <p>Login ke Panel Dapur</p>
         </div>
         <form onSubmit={handleSubmit} className="login-form">
           {error && <div className="login-error">{error}</div>}
           <div className="form-group">
-            <label htmlFor="token">Kitchen Token</label>
+            <label htmlFor="username">Username</label>
             <input
-              id="token"
-              type="password"
-              placeholder="Masukkan kitchen token"
-              value={token}
-              onChange={e => setToken(e.target.value)}
+              id="username"
+              type="text"
+              placeholder="Misal: kitchen"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
               required
               autoFocus
             />
           </div>
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              placeholder="Masukkan password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+            />
+          </div>
           <button type="submit" className="login-btn" disabled={loading}>
-            {loading ? 'Memverifikasi...' : 'Masuk'}
+            {loading ? 'Masuk...' : 'Masuk'}
           </button>
         </form>
-        <div className="login-hint">
-          <small>Gunakan token yang dikonfigurasi oleh administrator server.</small>
-        </div>
       </div>
     </div>
   )
@@ -95,14 +87,34 @@ function App() {
   const [connected, setConnected] = useState(false)
   const [filterStatus, setFilterStatus] = useState('all')
   const [soundEnabled, setSoundEnabled] = useState(true)
-  const [kitchenToken, setKitchenToken] = useState(null)
+  const [kitchenToken, setKitchenToken] = useState(() => localStorage.getItem(KITCHEN_TOKEN_KEY))
   const [loading, setLoading] = useState(true)
 
-  // Check for stored token on mount
-  useEffect(() => {
-    const stored = localStorage.getItem(KITCHEN_TOKEN_KEY)
-    if (stored) {
-      setKitchenToken(stored)
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem(KITCHEN_TOKEN_KEY)
+    setKitchenToken(null)
+    setSocket(null)
+    setConnected(false)
+    setOrders([])
+    setWaiterRequests([])
+  }, [])
+
+  // Audio chime for new orders
+  const playNotification = useCallback(() => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(880, ctx.currentTime)
+      osc.frequency.setValueAtTime(1108.73, ctx.currentTime + 0.1)
+      gain.gain.setValueAtTime(0.2, ctx.currentTime)
+      osc.start()
+      setTimeout(() => { osc.stop(); ctx.close() }, 200)
+    } catch (err) {
+      console.error(err)
     }
   }, [])
 
@@ -114,11 +126,18 @@ function App() {
       transports: ['websocket', 'polling'],
       auth: { token: kitchenToken }
     })
+    // eslint-disable-next-line react/set-state-in-effect
     setSocket(newSocket)
 
     newSocket.on('connect', () => {
       setConnected(true)
       newSocket.emit('join-kitchen')
+    })
+
+    newSocket.on('error', ({ message }) => {
+      if (message.includes('Unauthorized')) {
+        handleLogout()
+      }
     })
 
     newSocket.on('disconnect', () => setConnected(false))
@@ -158,38 +177,15 @@ function App() {
     })
 
     return () => newSocket.close()
-  }, [kitchenToken, soundEnabled])
+  }, [kitchenToken, soundEnabled, handleLogout, playNotification])
 
-  const handleLogout = () => {
-    localStorage.removeItem(KITCHEN_TOKEN_KEY)
-    setKitchenToken(null)
-    setSocket(null)
-    setConnected(false)
-    setOrders([])
-    setWaiterRequests([])
-  }
+
 
   const handleResolveWaiterRequest = (requestId) => {
     if (!socket || !kitchenToken) return
     socket.emit('resolve-waiter-request', { requestId })
   }
 
-  const playNotification = () => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)()
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.type = 'sine'
-      osc.frequency.value = 800
-      gain.gain.value = 0.1
-      osc.start()
-      setTimeout(() => { osc.stop(); ctx.close() }, 200)
-    } catch (e) {
-      // Ignore audio errors
-    }
-  }
 
   const updateStatus = (orderId, newStatus) => {
     if (!socket || !kitchenToken) return

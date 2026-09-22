@@ -2,17 +2,15 @@ const request = require('supertest');
 const fs = require('fs');
 const path = require('path');
 
-// Ensure env vars are loaded/set for test
-if (!process.env.ADMIN_TOKEN) {
-  process.env.ADMIN_TOKEN = 'test-admin-token';
-  process.env.KITCHEN_TOKEN = 'test-kitchen-token';
-}
-
+const auth = require('../auth');
 const { app, server } = require('../index');
+
+let testAdminToken;
 
 beforeAll(() => {
   jest.spyOn(console, 'log').mockImplementation(() => {});
   jest.spyOn(console, 'error').mockImplementation(() => {});
+  testAdminToken = auth.generateToken({ id: 'u1', username: 'admin', role: 'admin' });
 });
 
 afterAll(() => {
@@ -36,7 +34,7 @@ describe('API Endpoints', () => {
     it('GET /api/menu should return menu array when authorized', async () => {
       const res = await request(app)
         .get('/api/menu')
-        .set('Authorization', `Bearer ${process.env.ADMIN_TOKEN}`);
+        .set('Authorization', `Bearer ${testAdminToken}`);
       expect(res.statusCode).toEqual(200);
       expect(res.body).toHaveProperty('menu');
       expect(res.body).toHaveProperty('categories');
@@ -53,7 +51,7 @@ describe('API Endpoints', () => {
     it('GET /api/tables should return tables list when authorized', async () => {
       const res = await request(app)
         .get('/api/tables')
-        .set('Authorization', `Bearer ${process.env.ADMIN_TOKEN}`);
+        .set('Authorization', `Bearer ${testAdminToken}`);
       expect(res.statusCode).toEqual(200);
       expect(Array.isArray(res.body)).toBeTruthy();
       if (res.body.length > 0) {

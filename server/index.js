@@ -12,6 +12,8 @@ const db = require('./db');
 const { validate } = require('./validation');
 const auth = require('./auth');
 const multer = require('multer');
+const helmet = require('helmet');
+const bcrypt = require('bcryptjs');
 
 db.init();
 const s = db.getStatements();
@@ -76,6 +78,7 @@ io.use((socket, next) => {
   next();
 });
 
+app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
@@ -432,6 +435,27 @@ function broadcastMenuUpdated() {
 }
 
 // REST endpoints
+
+// Auth: Login endpoint
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username dan password wajib diisi' });
+  }
+
+  const user = s.getUserByUsername.get(username);
+  if (!user) {
+    return res.status(401).json({ error: 'Username atau password salah' });
+  }
+
+  const isMatch = bcrypt.compareSync(password, user.password_hash);
+  if (!isMatch) {
+    return res.status(401).json({ error: 'Username atau password salah' });
+  }
+
+  const token = auth.generateToken(user);
+  res.json({ token, role: user.role, username: user.username });
+});
 // Admin: Upload Image
 app.post('/api/upload', auth.requireAdmin, (req, res, next) => {
   upload.single('image')(req, res, (err) => {
@@ -572,6 +596,12 @@ app.get('/kitchen.html', (req, res) => {
 // Serve admin/table management page
 app.get('/admin.html', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/admin/index.html'));
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  logger.error(err.stack || err.message || err);
+  res.status(500).json({ error: 'Terjadi kesalahan pada server (Internal Server Error)' });
 });
 
 const PORT = process.env.PORT || 3000;
