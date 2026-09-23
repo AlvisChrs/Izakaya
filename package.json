@@ -24,7 +24,8 @@
     "qrcode": "^1.5.3",
     "socket.io": "^4.7.5",
     "uuid": "^9.0.1",
-    "winston": "^3.19.0"
+    "winston": "^3.19.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "jest": "^30.5.2",

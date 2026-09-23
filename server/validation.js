@@ -1,58 +1,48 @@
+const { z } = require('zod');
 const { v4: uuidv4 } = require('uuid');
 
-// Validation helpers
+const schemas = {
+  tableId: z.string().regex(/^table-\d+$/),
+  orderId: z.string().uuid(),
+  menuItem: z.object({
+    menuId: z.string().startsWith('m'),
+    quantity: z.number().int().positive(),
+    notes: z.string().optional()
+  }),
+  menuItems: z.array(z.object({
+    menuId: z.string().startsWith('m'),
+    quantity: z.number().int().positive(),
+    notes: z.string().optional()
+  })).min(1),
+  notes: z.string().max(500).optional(),
+  orderStatus: z.enum(['pending', 'preparing', 'ready', 'completed']),
+  menuInput: z.object({
+    name: z.string().trim().min(1).max(100),
+    price: z.number().positive(),
+    category: z.string().trim().min(1).max(50),
+    image: z.string().optional(),
+    description: z.string().optional()
+  }),
+  waiterRequest: z.object({
+    tableId: z.string().regex(/^table-\d+$/),
+    requestType: z.string().trim().min(1).max(100)
+  })
+};
+
+// Backward compatible validation helpers that use Zod under the hood
 const validate = {
-  // Table ID format: table-1, table-2, etc.
-  tableId: (id) => typeof id === 'string' && /^table-\d+$/.test(id),
-
-  // Order ID: UUID v4
-  orderId: (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id),
-
-  // Menu item in cart/order
-  menuItem: (item) => {
-    if (!item || typeof item !== 'object') return false;
-    return (
-      typeof item.menuId === 'string' && item.menuId.startsWith('m') &&
-      typeof item.quantity === 'number' && Number.isInteger(item.quantity) && item.quantity > 0 &&
-      (item.notes === undefined || typeof item.notes === 'string')
-    );
+  tableId: (id) => schemas.tableId.safeParse(id).success,
+  orderId: (id) => schemas.orderId.safeParse(id).success,
+  menuItem: (item) => schemas.menuItem.safeParse(item).success,
+  menuItems: (items) => schemas.menuItems.safeParse(items).success,
+  notes: (n) => {
+    if (n === undefined || n === null || n === '') return true;
+    return schemas.notes.safeParse(n).success;
   },
-
-  // Array of menu items (cart)
-  menuItems: (items) => Array.isArray(items) && items.length > 0 && items.every(validate.menuItem),
-
-  // Notes: optional string, max 500 chars
-  notes: (notes) => notes === undefined || notes === '' || (typeof notes === 'string' && notes.length <= 500),
-
-  // Order status
-  orderStatus: (status) => ['pending', 'preparing', 'ready', 'completed'].includes(status),
-
-  // Menu item input for CRUD
-  menuInput: (data) => {
-    if (!data || typeof data !== 'object') return false;
-    const { name, price, category, image, description } = data;
-    return (
-      typeof name === 'string' && name.trim().length > 0 && name.length <= 100 &&
-      typeof price === 'number' && price > 0 &&
-      typeof category === 'string' && category.trim().length > 0 && category.length <= 50 &&
-      (image === undefined || typeof image === 'string') &&
-      (description === undefined || typeof description === 'string')
-    );
-  },
-
-  // Waiter request validation
-  waiterRequest: (data) => {
-    if (!data || typeof data !== 'object') return false;
-    return (
-      validate.tableId(data.tableId) &&
-      typeof data.requestType === 'string' &&
-      data.requestType.trim().length > 0 &&
-      data.requestType.length <= 100
-    );
-  },
-
-  // UUID v4 generator for new orders
+  orderStatus: (status) => schemas.orderStatus.safeParse(status).success,
+  menuInput: (data) => schemas.menuInput.safeParse(data).success,
+  waiterRequest: (data) => schemas.waiterRequest.safeParse(data).success,
   generateOrderId: () => uuidv4(),
 };
 
-module.exports = { validate };
+module.exports = { validate, schemas };
