@@ -2,8 +2,8 @@
   /* Core Colors */
   --bg-primary: #0a0a0c;
   --bg-secondary: #121216;
-  --bg-tertiary: rgba(26, 26, 30, 0.6);
-  --bg-glass: rgba(18, 18, 22, 0.7);
+  --bg-tertiary: rgb(26 26 30 / 60%);
+  --bg-glass: rgb(18 18 22 / 70%);
   
   /* Text Colors */
   --text-primary: #f5f5f7;
@@ -11,12 +11,12 @@
   --text-tertiary: #71717a;
   
   /* Accent Colors - Izakaya Theme (Neon Red/Orange, Gold) */
-  --accent-red: #ff3366;
-  --accent-red-glow: rgba(255, 51, 102, 0.4);
+  --accent-red: #f36;
+  --accent-red-glow: rgb(255 51 102 / 40%);
   --accent-orange: #ff6b35;
-  --accent-orange-glow: rgba(255, 107, 53, 0.4);
+  --accent-orange-glow: rgb(255 107 53 / 40%);
   --accent-gold: #fbbf24;
-  --accent-gold-glow: rgba(251, 191, 36, 0.3);
+  --accent-gold-glow: rgb(251 191 36 / 30%);
   
   /* Status Colors */
   --success: #10b981;
@@ -25,11 +25,11 @@
   --info: #3b82f6;
 
   /* Borders & Shadows */
-  --border-light: rgba(255, 255, 255, 0.08);
-  --border-glow: rgba(255, 51, 102, 0.2);
-  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+  --border-light: rgb(255 255 255 / 8%);
+  --border-glow: rgb(255 51 102 / 20%);
+  --shadow-sm: 0 4px 6px -1px rgb(0 0 0 / 30%);
+  --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 40%);
+  --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 50%), 0 10px 10px -5px rgb(0 0 0 / 30%);
   --shadow-neon: 0 0 15px var(--accent-red-glow);
 
   /* Typography */
@@ -42,8 +42,8 @@ body {
   padding: 0;
   background-color: var(--bg-primary);
   background-image: 
-    radial-gradient(circle at 15% 50%, rgba(255, 51, 102, 0.05), transparent 25%),
-    radial-gradient(circle at 85% 30%, rgba(255, 107, 53, 0.05), transparent 25%);
+    radial-gradient(circle at 15% 50%, rgb(255 51 102 / 5%), transparent 25%),
+    radial-gradient(circle at 85% 30%, rgb(255 107 53 / 5%), transparent 25%);
   color: var(--text-primary);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
@@ -92,8 +92,7 @@ button {
 /* Glassmorphism Utility */
 .glass-panel {
   background: var(--bg-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(10px);
   border: 1px solid var(--border-light);
   box-shadow: var(--shadow-md);
 }
