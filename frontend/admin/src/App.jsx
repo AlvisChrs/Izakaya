@@ -82,7 +82,81 @@ function LoginPage({ onLogin }) {
   );
 }
 
+function OrderHistoryTab({ adminToken }) {
+  const [historyOrders, setHistoryOrders] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/api/orders/history?page=${page}&limit=20`, {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const data = await res.json();
+        setHistoryOrders(data.orders);
+        setTotalPages(data.pagination.totalPages || 1);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchHistory();
+  }, [page, adminToken]);
+
+  return (
+    <div className="order-history-section main">
+      <h2>Riwayat Pesanan</h2>
+      {loading ? <p>Memuat riwayat pesanan...</p> : (
+        <div className="table-responsive">
+          <table className="history-table">
+            <thead>
+              <tr>
+                <th>ID Pesanan</th>
+                <th>Waktu</th>
+                <th>Meja</th>
+                <th>Status</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {historyOrders.length === 0 && (
+                <tr>
+                  <td colSpan="5" style={{textAlign: 'center'}}>Belum ada riwayat pesanan</td>
+                </tr>
+              )}
+              {historyOrders.map(o => (
+                <tr key={o.id}>
+                  <td>#{o.id.substring(0,8)}</td>
+                  <td>{new Date(o.timestamp).toLocaleString('id-ID')}</td>
+                  <td>Meja {o.tableNumber}</td>
+                  <td>
+                    <span className={`status-badge ${o.status}`}>{o.status}</span>
+                  </td>
+                  <td>Rp {o.total.toLocaleString('id-ID')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          
+          {totalPages > 1 && (
+            <div className="pagination">
+              <button disabled={page === 1} onClick={() => setPage(p => p - 1)}>Sebelumnya</button>
+              <span>Halaman {page} dari {totalPages}</span>
+              <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Selanjutnya</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function App() {
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [tables, setTables] = useState([]);
   const [menu, setMenu] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -438,6 +512,18 @@ function App() {
         </div>
       </header>
 
+      <div className="admin-tabs">
+        <button className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
+          📋 Dashboard & Menu
+        </button>
+        <button className={`tab-btn ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
+          📜 Riwayat Pesanan
+        </button>
+      </div>
+
+      {activeTab === 'history' && <OrderHistoryTab adminToken={adminToken} />}
+      
+      {activeTab === 'dashboard' && (
       <main className="main">
         {/* Active Waiter Calls Section */}
         {waiterRequests.length > 0 && (
@@ -597,6 +683,8 @@ function App() {
           </div>
         </section>
       </main>
+      )}
+
 
       {/* Add / Edit Menu Modal */}
       {showMenuModal && (

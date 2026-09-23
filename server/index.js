@@ -578,6 +578,42 @@ app.get('/api/tables/:tableId', auth.requireAdmin, (req, res) => {
   }
 });
 
+// Admin: Order History with Pagination
+app.get('/api/orders/history', auth.requireAdmin, (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    const ordersRaw = s.getOrderHistory.all(limit, offset);
+    const countRow = s.getOrderHistoryCount.get();
+    const totalCount = countRow ? countRow.count : 0;
+    const totalPages = Math.ceil(totalCount / limit);
+
+    const orders = ordersRaw.map(o => {
+      const table = s.getTable.get(o.table_id);
+      return {
+        ...o,
+        tableNumber: table ? table.number : '?',
+        items: JSON.parse(o.items)
+      };
+    });
+
+    res.json({
+      orders,
+      pagination: {
+        total: totalCount,
+        page,
+        limit,
+        totalPages
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching order history:', err);
+    res.status(500).json({ error: 'Gagal memuat riwayat pesanan' });
+  }
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() });

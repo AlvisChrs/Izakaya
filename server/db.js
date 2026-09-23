@@ -59,6 +59,12 @@ function init() {
   }
 
   try {
+    db.exec(`ALTER TABLE menu ADD COLUMN is_deleted INTEGER DEFAULT 0`);
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
     db.exec(`ALTER TABLE tables ADD COLUMN access_token TEXT`);
   } catch (e) {
     // Column already exists
@@ -131,12 +137,12 @@ function getStatements() {
       updateTableQrCode: db.prepare('UPDATE tables SET qr_code = ? WHERE id = ?'),
 
       // Menu
-      getAllMenu: db.prepare('SELECT id, name, price, category, image, description, available FROM menu'),
-      getMenuItemById: db.prepare('SELECT id, name, price, category, image, description, available FROM menu WHERE id = ?'),
-      getMenuCategories: db.prepare('SELECT DISTINCT category FROM menu ORDER BY category'),
+      getAllMenu: db.prepare('SELECT id, name, price, category, image, description, available FROM menu WHERE is_deleted = 0'),
+      getMenuItemById: db.prepare('SELECT id, name, price, category, image, description, available FROM menu WHERE id = ? AND is_deleted = 0'),
+      getMenuCategories: db.prepare('SELECT DISTINCT category FROM menu WHERE is_deleted = 0 ORDER BY category'),
       createMenuItem: db.prepare('INSERT INTO menu (id, name, price, category, image, description, available) VALUES (?, ?, ?, ?, ?, ?, ?)'),
       updateMenuItem: db.prepare('UPDATE menu SET name = ?, price = ?, category = ?, image = ?, description = ? WHERE id = ?'),
-      deleteMenuItem: db.prepare('DELETE FROM menu WHERE id = ?'),
+      deleteMenuItem: db.prepare('UPDATE menu SET is_deleted = 1 WHERE id = ?'),
       toggleMenuAvailability: db.prepare('UPDATE menu SET available = ? WHERE id = ?'),
 
       // Orders
@@ -146,6 +152,8 @@ function getStatements() {
       getOrderById: db.prepare('SELECT * FROM orders WHERE id = ?'),
       updateOrderStatus: db.prepare('UPDATE orders SET status = ? WHERE id = ?'),
       markTableOrdersCompleted: db.prepare("UPDATE orders SET status = 'completed' WHERE table_id = ? AND status != 'completed'"),
+      getOrderHistory: db.prepare('SELECT * FROM orders ORDER BY timestamp DESC LIMIT ? OFFSET ?'),
+      getOrderHistoryCount: db.prepare('SELECT COUNT(*) as count FROM orders'),
       // Users
       getUserByUsername: db.prepare('SELECT * FROM users WHERE username = ?'),
     };
