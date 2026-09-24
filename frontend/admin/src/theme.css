@@ -1,0 +1,179 @@
+/* Admin Dark Theme Overrides */
+body.dark-theme {
+  background-color: #121212 !important;
+  color: #e0e0e0 !important;
+}
+
+body.dark-theme .app {
+  background-color: #121212 !important;
+  color: #e0e0e0 !important;
+}
+
+body.dark-theme .header {
+  background: #1e1e1e !important;
+  border-bottom: 1px solid #333 !important;
+}
+
+body.dark-theme .header h1 {
+  color: #f5f5f5 !important;
+}
+
+body.dark-theme .stat {
+  background: #2a2a2a !important;
+  border-color: #444 !important;
+}
+
+body.dark-theme .stat-value {
+  color: #fbbf24 !important;
+}
+
+body.dark-theme .stat-label {
+  color: #aaa !important;
+}
+
+body.dark-theme .admin-tabs {
+  border-bottom: 1px solid #333 !important;
+}
+
+body.dark-theme .tab-btn {
+  color: #888 !important;
+}
+
+body.dark-theme .tab-btn:hover {
+  color: #ccc !important;
+}
+
+body.dark-theme .tab-btn.active {
+  color: #fbbf24 !important;
+  border-bottom-color: #fbbf24 !important;
+}
+
+body.dark-theme .table-card {
+  background: #1e1e1e !important;
+  border: 1px solid #333 !important;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important;
+}
+
+body.dark-theme .table-header {
+  border-bottom: 1px solid #333 !important;
+}
+
+body.dark-theme .table-number {
+  color: #eee !important;
+}
+
+body.dark-theme .menu-card {
+  background: #1e1e1e !important;
+  border: 1px solid #333 !important;
+}
+
+body.dark-theme .menu-item-name {
+  color: #eee !important;
+}
+
+body.dark-theme .menu-item-price {
+  color: #fbbf24 !important;
+}
+
+body.dark-theme .modal {
+  background: #1e1e1e !important;
+  color: #e0e0e0 !important;
+  border: 1px solid #333 !important;
+}
+
+body.dark-theme .modal-header h2 {
+  color: #f5f5f5 !important;
+}
+
+body.dark-theme .form-group label {
+  color: #aaa !important;
+}
+
+body.dark-theme .form-group input, 
+body.dark-theme .form-group select, 
+body.dark-theme .form-group textarea {
+  background: #2a2a2a !important;
+  border-color: #444 !important;
+  color: #eee !important;
+}
+
+body.dark-theme .order-history-section {
+  background: #1e1e1e !important;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important;
+}
+
+body.dark-theme .order-history-section h2 {
+  color: #eee !important;
+}
+
+body.dark-theme .history-table th {
+  background: #2a2a2a !important;
+  color: #bbb !important;
+  border-bottom: 1px solid #444 !important;
+}
+
+body.dark-theme .history-table td {
+  border-bottom: 1px solid #333 !important;
+  color: #ddd !important;
+}
+
+body.dark-theme .pagination button {
+  background: #2a2a2a !important;
+  border-color: #444 !important;
+  color: #eee !important;
+}
+
+body.dark-theme .pagination button:not(:disabled):hover {
+  background: #333 !important;
+}
+
+body.dark-theme .waiter-call-card {
+  background: #2a1515 !important;
+  border-left: 5px solid #ef4444 !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.1) !important;
+}
+
+body.dark-theme .waiter-call-type {
+  color: #eee !important;
+}
+
+body.dark-theme .login-container {
+  background: #121212 !important;
+}
+
+body.dark-theme .login-box {
+  background: #1e1e1e !important;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5) !important;
+}
+
+body.dark-theme .login-box h1 {
+  color: #fff !important;
+}
+
+body.dark-theme .login-box p {
+  color: #aaa !important;
+}
+
+.theme-toggle-btn {
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  color: #333;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.3s;
+  margin-left: 1rem;
+}
+.theme-toggle-btn:hover {
+  background: #e0e0e0;
+}
+
+body.dark-theme .theme-toggle-btn {
+  background: transparent;
+  border: 1px solid #444;
+  color: #fbbf24;
+}
+body.dark-theme .theme-toggle-btn:hover {
+  background: #2a2a2a;
+}

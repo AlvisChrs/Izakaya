@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { io } from 'socket.io-client'
 import './App.css'
+import './theme.css'
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin
 
@@ -28,6 +29,17 @@ function App() {
   const [connected, setConnected] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState(null)
   const [cashRequested, setCashRequested] = useState(false)
+  const [isLightMode, setIsLightMode] = useState(() => localStorage.getItem('customerTheme') === 'light')
+
+  useEffect(() => {
+    if (isLightMode) {
+      document.body.classList.add('light-theme');
+      localStorage.setItem('customerTheme', 'light');
+    } else {
+      document.body.classList.remove('light-theme');
+      localStorage.setItem('customerTheme', 'dark');
+    }
+  }, [isLightMode]);
 
   // Initialize socket
   useEffect(() => {
@@ -180,6 +192,12 @@ function App() {
       <header className="header">
         <h1>🏮 Izakaya</h1>
         <div className="header-actions">
+          <button 
+            className="theme-toggle-btn" 
+            onClick={() => setIsLightMode(!isLightMode)}
+          >
+            {isLightMode ? '🌙' : '☀️'}
+          </button>
           <button className="call-waiter-header-btn" onClick={() => setShowWaiterModal(true)}>
             🛎️ <span>Panggil Pelayan</span>
           </button>

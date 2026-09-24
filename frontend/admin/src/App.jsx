@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import './App.css';
+import './theme.css';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
 const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
@@ -156,6 +157,7 @@ function OrderHistoryTab({ adminToken }) {
 }
 
 function App() {
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('adminTheme') === 'dark');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [tables, setTables] = useState([]);
   const [menu, setMenu] = useState([]);
@@ -242,6 +244,16 @@ function App() {
     };
     fetchData();
   }, [adminToken]);
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.body.classList.add('dark-theme');
+      localStorage.setItem('adminTheme', 'dark');
+    } else {
+      document.body.classList.remove('dark-theme');
+      localStorage.setItem('adminTheme', 'light');
+    }
+  }, [isDarkMode]);
 
   // Initialize socket for real-time updates (requires admin token)
   useEffect(() => {
@@ -508,6 +520,12 @@ function App() {
             <span className="stat-value">Rp {totalRevenue.toLocaleString('id-ID')}</span>
             <span className="stat-label">Pendapatan</span>
           </div>
+          <button 
+            className="theme-toggle-btn" 
+            onClick={() => setIsDarkMode(!isDarkMode)}
+          >
+            {isDarkMode ? '☀️ Terang' : '🌙 Gelap'}
+          </button>
           <button className="logout-btn" onClick={handleLogout}>Logout</button>
         </div>
       </header>

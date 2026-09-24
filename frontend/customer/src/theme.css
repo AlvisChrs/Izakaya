@@ -1,0 +1,50 @@
+/* Customer Light Theme Overrides */
+body.light-theme {
+  --bg-primary: #f8f5f0 !important;
+  --bg-secondary: #fff !important;
+  --bg-tertiary: #f0ebe0 !important;
+  --bg-glass: rgba(255, 255, 255, 0.85) !important;
+  
+  --text-primary: #1f2937 !important;
+  --text-secondary: #4b5563 !important;
+  --text-tertiary: #6b7280 !important;
+  
+  --border-light: #e5e7eb !important;
+  --border-glow: rgba(243, 102, 102, 0.1) !important;
+  
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(255, 51, 102, 0.05), transparent 25%),
+    radial-gradient(circle at 85% 30%, rgba(255, 107, 53, 0.05), transparent 25%) !important;
+}
+
+body.light-theme .theme-toggle-btn {
+  background: #f8f5f0;
+  border: 1px solid #d1d5db;
+  color: #1f2937;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.3s;
+  margin-right: 0.5rem;
+}
+
+body.light-theme .theme-toggle-btn:hover {
+  background: #e5e7eb;
+}
+
+.theme-toggle-btn {
+  background: transparent;
+  border: 1px solid var(--border-light);
+  color: var(--accent-gold);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.3s;
+  margin-right: 0.5rem;
+}
+
+.theme-toggle-btn:hover {
+  background: var(--bg-tertiary);
+}
