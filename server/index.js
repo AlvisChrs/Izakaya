@@ -122,6 +122,18 @@ let activeWaiterRequests = [];
 // Cooldown map for call-waiter to prevent spam
 const callWaiterCooldown = new Map();
 
+// Helper: wrap socket handler with try-catch so one bad event never crashes the server
+function wrapHandler(socket, eventName, handler) {
+  return async (...args) => {
+    try {
+      await handler(...args);
+    } catch (err) {
+      logger.error(`Socket error on event "${eventName}" (socket ${socket.id}): ${err.stack || err.message}`);
+      socket.emit('error', { message: 'Terjadi kesalahan pada server, silakan coba lagi.' });
+    }
+  };
+}
+
 // Socket.io connection handling
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
@@ -135,7 +147,7 @@ io.on('connection', (socket) => {
   };
 
   // Customer joins a table using the unguessable token embedded in its QR code.
-  socket.on('join-table', ({ tableId, token } = {}) => {
+  socket.on('join-table', wrapHandler(socket, 'join-table', ({ tableId, token } = {}) => {
     if (!validate.tableId(tableId)) {
       socket.emit('error', { message: 'Invalid table ID' });
       return;
@@ -159,10 +171,10 @@ io.on('connection', (socket) => {
     } else {
       socket.emit('error', { message: 'Meja tidak ditemukan' });
     }
-  });
+  }));
 
   // Kitchen staff joins kitchen room (requires kitchen token)
-  socket.on('join-kitchen', () => {
+  socket.on('join-kitchen', wrapHandler(socket, 'join-kitchen', () => {
     if (socket.data.staffRole !== 'admin' && socket.data.staffRole !== 'kitchen') {
       socket.emit('error', { message: 'Unauthorized: Kitchen token required' });
       return;
@@ -172,10 +184,10 @@ io.on('connection', (socket) => {
     socket.emit('kitchen-orders', allOrders);
     socket.emit('waiter-requests-updated', activeWaiterRequests);
     console.log('Kitchen staff joined');
-  });
+  }));
 
   // Customer calls waiter
-  socket.on('call-waiter', ({ tableId, requestType }) => {
+  socket.on('call-waiter', wrapHandler(socket, 'call-waiter', ({ tableId, requestType }) => {
     if (!requireTableSession(tableId)) return;
     if (!validate.waiterRequest({ tableId, requestType })) {
       socket.emit('error', { message: 'Permintaan panggil pelayan tidak valid' });
@@ -214,10 +226,10 @@ io.on('connection', (socket) => {
     io.to(`table-${tableId}`).emit('waiter-request-active', request);
 
     console.log(`Waiter called by Table ${table.number}: ${requestType}`);
-  });
+  }));
 
   // Customer cancels waiter request
-  socket.on('cancel-waiter-request', (tableId) => {
+  socket.on('cancel-waiter-request', wrapHandler(socket, 'cancel-waiter-request', (tableId) => {
     if (!validate.tableId(tableId) || !requireTableSession(tableId)) return;
     const request = activeWaiterRequests.find(r => r.tableId === tableId && r.socketId === socket.id);
     if (!request) {
@@ -229,10 +241,10 @@ io.on('connection', (socket) => {
     io.to('kitchen').emit('waiter-requests-updated', activeWaiterRequests);
     io.to(`table-${tableId}`).emit('waiter-request-resolved', { tableId });
     console.log(`Waiter request cancelled by tableId ${tableId}`);
-  });
+  }));
 
   // Staff resolves waiter request (requires staff token)
-  socket.on('resolve-waiter-request', ({ requestId }) => {
+  socket.on('resolve-waiter-request', wrapHandler(socket, 'resolve-waiter-request', ({ requestId }) => {
     if (socket.data.staffRole !== 'admin' && socket.data.staffRole !== 'kitchen') {
       socket.emit('error', { message: 'Unauthorized: Staff token required' });
       return;
@@ -245,10 +257,10 @@ io.on('connection', (socket) => {
       io.to(`table-${reqObj.tableId}`).emit('waiter-request-resolved', { tableId: reqObj.tableId });
       console.log(`Waiter request ${requestId} resolved for Table ${reqObj.tableNumber}`);
     }
-  });
+  }));
 
   // Customer places order
-  socket.on('place-order', ({ tableId, items, notes }) => {
+  socket.on('place-order', wrapHandler(socket, 'place-order', ({ tableId, items, notes }) => {
     if (!validate.tableId(tableId) || !requireTableSession(tableId)) return;
     if (!validate.menuItems(items)) {
       socket.emit('error', { message: 'Invalid order items' });
@@ -300,10 +312,10 @@ io.on('connection', (socket) => {
     io.to('kitchen').emit('new-order', { ...order, tableNumber: table.number, tableId });
 
     console.log(`New order ${orderId} from table ${table.number}`);
-  });
+  }));
 
   // Kitchen updates order status (requires kitchen token)
-  socket.on('update-order-status', ({ orderId, status }) => {
+  socket.on('update-order-status', wrapHandler(socket, 'update-order-status', ({ orderId, status }) => {
     if (socket.data.staffRole !== 'kitchen') {
       socket.emit('error', { message: 'Unauthorized: Kitchen token required' });
       return;
@@ -327,10 +339,10 @@ io.on('connection', (socket) => {
     // Notify kitchen
     io.to('kitchen').emit('order-status-updated', { orderId, status, tableNumber: order.table_number, tableId: order.table_id });
     console.log(`Order ${orderId} status: ${status}`);
-  });
+  }));
 
   // Customer requests bill
-  socket.on('request-bill', (tableId) => {
+  socket.on('request-bill', wrapHandler(socket, 'request-bill', (tableId) => {
     if (!validate.tableId(tableId) || !requireTableSession(tableId)) return;
     const table = db.getTableWithOrders(tableId);
     if (!table) return;
@@ -349,10 +361,10 @@ io.on('connection', (socket) => {
 
     io.to(`table-${tableId}`).emit('bill-generated', bill);
     console.log(`Bill generated for table ${table.number}`);
-  });
+  }));
 
   // Customer pays or requests cash payment
-  socket.on('pay-bill', ({ tableId, paymentMethod }) => {
+  socket.on('pay-bill', wrapHandler(socket, 'pay-bill', ({ tableId, paymentMethod }) => {
     if (!validate.tableId(tableId) || !requireTableSession(tableId)) return;
     const table = s.getTable.get(tableId);
     if (!table) return;
@@ -379,10 +391,10 @@ io.on('connection', (socket) => {
       io.to('kitchen').emit('orders-completed', { tableId, tableNumber: table.number });
       console.log(`QRIS Payment confirmed for table ${table.number}`);
     }
-  });
+  }));
 
   // Admin requests bill for printing
-  socket.on('admin-request-bill', (tableId) => {
+  socket.on('admin-request-bill', wrapHandler(socket, 'admin-request-bill', (tableId) => {
     if (socket.data.staffRole !== 'admin' && socket.data.staffRole !== 'kitchen') {
       socket.emit('error', { message: 'Unauthorized: Staff token required' });
       return;
@@ -404,10 +416,10 @@ io.on('connection', (socket) => {
     bill.total = bill.subtotal + bill.tax;
 
     socket.emit('admin-bill-data', { tableId, bill });
-  });
+  }));
 
   // Admin manually confirms payment
-  socket.on('admin-confirm-payment', (tableId) => {
+  socket.on('admin-confirm-payment', wrapHandler(socket, 'admin-confirm-payment', (tableId) => {
     if (socket.data.staffRole !== 'admin' && socket.data.staffRole !== 'kitchen') {
       socket.emit('error', { message: 'Unauthorized: Staff token required' });
       return;
@@ -420,7 +432,7 @@ io.on('connection', (socket) => {
     io.to(`table-${tableId}`).emit('payment-confirmed');
     io.to('kitchen').emit('orders-completed', { tableId, tableNumber: table.number });
     console.log(`Manual Payment confirmed by Admin for table ${table.number}`);
-  });
+  }));
 
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
@@ -648,8 +660,13 @@ async function startServer() {
   for (const table of tables) {
     const accessToken = s.getTableAccessToken.get(table.id)?.accessToken;
     const url = `${baseUrl}/customer.html?table=${table.id}&access=${encodeURIComponent(accessToken)}`;
-    const qrCode = await QRCode.toDataURL(url);
-    s.updateTableQrCode.run(qrCode, table.id);
+    try {
+      const qrCode = await QRCode.toDataURL(url);
+      s.updateTableQrCode.run(qrCode, table.id);
+    } catch (err) {
+      // QR generation failure is non-fatal: server still starts, admin can regenerate later
+      logger.error(`Failed to generate QR code for table ${table.id}: ${err.message}`);
+    }
   }
   server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
@@ -705,15 +722,33 @@ function shutdown(signal) {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
+// Fatal errors that should always trigger a graceful shutdown
+const FATAL_ERROR_CODES = new Set([
+  'EADDRINUSE',    // Port already in use — server never started
+  'ERR_INVALID_ARG_TYPE', // Fundamental programming error
+]);
+
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
-  console.error('Uncaught exception:', err);
-  shutdown('uncaughtException');
+  logger.error(`Uncaught exception: ${err.stack || err.message}`);
+
+  // Only shut down for errors that make the process state unrecoverable.
+  // For all other errors, log and keep running — the failed request is already
+  // isolated by the wrapHandler / try-catch guards elsewhere.
+  const isFatal = FATAL_ERROR_CODES.has(err.code) || err instanceof RangeError;
+  if (isFatal) {
+    logger.error('Fatal uncaught exception — initiating graceful shutdown');
+    shutdown('uncaughtException');
+  } else {
+    logger.warn(`Non-fatal uncaught exception (code: ${err.code || 'none'}) — server continues running`);
+  }
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error('Unhandled rejection:', reason);
-  shutdown('unhandledRejection');
+  // Unhandled promise rejections are logged but do NOT shut down the server.
+  // Socket handlers are already wrapped with wrapHandler; any rejection that
+  // leaks here is unexpected but not necessarily fatal.
+  logger.error(`Unhandled promise rejection: ${reason instanceof Error ? reason.stack : reason}`);
 });
 
 if (require.main === module) {

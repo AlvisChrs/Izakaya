@@ -161,13 +161,23 @@ function getStatements() {
   return statements;
 }
 
+// Safe JSON.parse: returns fallback instead of throwing on corrupt data
+function safeParseItems(raw, orderId) {
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error(`Failed to parse items JSON for order ${orderId}: ${e.message}`);
+    return [];
+  }
+}
+
 function getTableWithOrders(tableId) {
   const s = getStatements();
   const table = s.getTable.get(tableId);
   if (!table) return null;
   const orders = s.getOrdersByTable.all(tableId).map(o => ({
     ...o,
-    items: JSON.parse(o.items)
+    items: safeParseItems(o.items, o.id)
   }));
   return { ...table, orders };
 }
@@ -177,7 +187,7 @@ function getAllPendingOrdersWithTable() {
   const orders = s.getPendingOrders.all();
   return orders.map(o => {
     const table = s.getTable.get(o.table_id);
-    return { ...o, tableNumber: table?.number, tableId: o.table_id, items: JSON.parse(o.items) };
+    return { ...o, tableNumber: table?.number, tableId: o.table_id, items: safeParseItems(o.items, o.id) };
   });
 }
 
