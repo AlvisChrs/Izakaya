@@ -91,13 +91,13 @@ function init() {
   if (menuCount === 0) {
     const defaultMenu = [
       { id: 'm1', name: 'Edamame', price: 35000, category: 'Appetizer', image: '🫛', description: 'Rebus kacang edamame dengan garam laut', available: 1 },
-      { id: 'm2', name: 'Gyoza (5 pcs)', price: 55000, category: 'Appetizer', image: '🥟', description: 'Dumpling goreng isi ayam sayur', available: 1 },
+      { id: 'm2', name: 'Takoyaki', price: 55000, category: 'Appetizer', image: '/uploads/takoyaki.jpg', description: 'Bola gurita dengan saus manis dan katsuobushi', available: 1 },
       { id: 'm3', name: 'Karaage', price: 65000, category: 'Appetizer', image: '🍗', description: 'Ayam goreng khas Jepang crispy', available: 1 },
-      { id: 'm4', name: 'Salmon Sashimi (6 pcs)', price: 120000, category: 'Sashimi', image: '🍣', description: 'Salmon segar dipotong tipis', available: 1 },
-      { id: 'm5', name: 'Tuna Sashimi (6 pcs)', price: 110000, category: 'Sashimi', image: '🍣', description: 'Tuna segar dipotong tipis', available: 1 },
+      { id: 'm4', name: 'Salmon Sashimi (6 pcs)', price: 120000, category: 'Sashimi', image: '/uploads/sushi.jpg', description: 'Salmon segar dipotong tipis', available: 1 },
+      { id: 'm5', name: 'Tuna Sashimi (6 pcs)', price: 110000, category: 'Sashimi', image: '/uploads/sushi.jpg', description: 'Tuna segar dipotong tipis', available: 1 },
       { id: 'm6', name: 'Chicken Teriyaki', price: 85000, category: 'Main', image: '🍗', description: 'Ayam panggang saus teriyaki manis', available: 1 },
       { id: 'm7', name: 'Salmon Teriyaki', price: 110000, category: 'Main', image: '🐟', description: 'Salmon panggang saus teriyaki', available: 1 },
-      { id: 'm8', name: 'Yakisoba', price: 75000, category: 'Main', image: '🍜', description: 'Mie goreng khas Jepang sayur & ayam', available: 1 },
+      { id: 'm8', name: 'Shoyu Ramen', price: 75000, category: 'Main', image: '/uploads/ramen.jpg', description: 'Ramen kuah shoyu dengan chashu', available: 1 },
       { id: 'm9', name: 'Gyudon', price: 80000, category: 'Main', image: '🍚', description: 'Nasi dengan irisan daging sapi manis', available: 1 },
       { id: 'm10', name: 'Miso Soup', price: 25000, category: 'Soup', image: '🍲', description: 'Sup miso tradisional dengan tofu & wakame', available: 1 },
       { id: 'm11', name: 'Green Tea Ice Cream', price: 35000, category: 'Dessert', image: '🍵', description: 'Es krim matcha premium', available: 1 },

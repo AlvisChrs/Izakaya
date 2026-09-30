@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { io } from 'socket.io-client';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './App.css';
 import './theme.css';
 
@@ -155,6 +156,107 @@ function OrderHistoryTab({ adminToken }) {
     </div>
   );
 }
+
+
+function SalesReportTab({ orders, menu }) {
+  // Process orders for charts
+  const completedOrders = orders.filter(o => o.status === "completed");
+  
+  // 1. Revenue over time (Mocking days based on timestamp, but right now all might be same day)
+  // We will just group by Date string
+  const revenueByDate = {};
+  completedOrders.forEach(o => {
+    const date = new Date(o.timestamp).toLocaleDateString("id-ID");
+    revenueByDate[date] = (revenueByDate[date] || 0) + o.total;
+  });
+  
+  const chartData = Object.keys(revenueByDate).map(date => ({
+    date,
+    revenue: revenueByDate[date]
+  }));
+
+  // 2. Top Selling Items
+  const itemCounts = {};
+  completedOrders.forEach(o => {
+    o.items.forEach(item => {
+      itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
+    });
+  });
+
+  const topItems = Object.keys(itemCounts)
+    .map(name => ({ name, sold: itemCounts[name] }))
+    .sort((a, b) => b.sold - a.sold)
+    .slice(0, 5); // Top 5
+
+  const handleExport = () => {
+    // Generate simple CSV
+    let csvContent = "data:text/csv;charset=utf-8,Tanggal,Total Pendapatan\n";
+    chartData.forEach(row => {
+      csvContent += `${row.date},${row.revenue}\n`;
+    });
+    
+    csvContent += "\nMenu Terlaris,Jumlah Terjual\n";
+    topItems.forEach(row => {
+      csvContent += `${row.name},${row.sold}\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "laporan_penjualan_izakaya.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <main className="main">
+      <div className="section-title-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
+        <h2>📈 Laporan Penjualan</h2>
+        <button className="export-btn" onClick={handleExport} style={{ background: "#10b981", color: "white", padding: "10px 20px", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>
+          📥 Export CSV
+        </button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "2rem" }}>
+        <div className="order-history-section" style={{ padding: "20px", background: "var(--bg-card, #fff)", borderRadius: "12px" }}>
+          <h3 style={{ marginBottom: "1rem" }}>Grafik Pendapatan</h3>
+          {chartData.length > 0 ? (
+            <div style={{ width: "100%", height: 300 }}>
+              <ResponsiveContainer>
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => `Rp ${value.toLocaleString("id-ID")}`} />
+                  <Legend />
+                  <Bar dataKey="revenue" name="Pendapatan (Rp)" fill="#fbbf24" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p>Belum ada data penjualan selesai.</p>
+          )}
+        </div>
+
+        <div className="order-history-section" style={{ padding: "20px", background: "var(--bg-card, #fff)", borderRadius: "12px" }}>
+          <h3 style={{ marginBottom: "1rem" }}>🔥 5 Menu Terlaris</h3>
+          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+            {topItems.length > 0 ? topItems.map((item, index) => (
+              <li key={index} style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #e5e7eb" }}>
+                <span>{index + 1}. {item.name}</span>
+                <strong style={{ color: "#10b981" }}>{item.sold} porsi</strong>
+              </li>
+            )) : (
+              <p>Belum ada data.</p>
+            )}
+          </ul>
+        </div>
+      </div>
+    </main>
+  );
+}
+
 
 function App() {
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('adminTheme') === 'dark');
@@ -537,9 +639,13 @@ function App() {
         <button className={`tab-btn ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
           📜 Riwayat Pesanan
         </button>
+        <button className={`tab-btn ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>
+          📈 Laporan Penjualan
+        </button>
       </div>
 
       {activeTab === 'history' && <OrderHistoryTab adminToken={adminToken} />}
+      {activeTab === 'reports' && <SalesReportTab orders={orders} menu={menu} />}
       
       {activeTab === 'dashboard' && (
       <main className="main">
