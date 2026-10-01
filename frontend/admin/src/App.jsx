@@ -468,8 +468,9 @@ function App() {
       price: item.price,
       category: item.category,
       image: item.image || '🍱',
-      description: item.description || ''
-    });
+      description: item.description || '',
+        available: item.available !== undefined ? item.available : 100
+      });
     setCustomCategory('');
     setImageFile(null);
     setShowMenuModal(true);
@@ -539,8 +540,9 @@ function App() {
       price: Number(menuForm.price),
       category: targetCategory,
       image: finalImageUrl,
-      description: menuForm.description.trim()
-    };
+      description: menuForm.description.trim(),
+        available: Number(menuForm.available)
+      };
 
     try {
       const url = editingMenu ? `${API_URL}/api/menu/${editingMenu.id}` : `${API_URL}/api/menu`;
@@ -900,8 +902,10 @@ function App() {
                 />
               </div>
 
-              <div className="form-actions">
-                <button type="button" className="cancel-btn" onClick={() => setShowMenuModal(false)}>
+              <div className="form-group"><label>Stok (Porsi) *</label><input type="number" min="0" placeholder="Misal: 100" value={menuForm.available} onChange={e => setMenuForm({ ...menuForm, available: e.target.value })} /></div>
+
+                <div className="form-actions">
+                  <button type="button" className="cancel-btn" onClick={() => setShowMenuModal(false)}>
                   Batal
                 </button>
                 <button type="submit" className="save-btn">

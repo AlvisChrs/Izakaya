@@ -276,8 +276,8 @@ io.on('connection', (socket) => {
     const authoritativeItems = [];
     for (const item of items) {
       const dbItem = allMenuItems.find(m => m.id === item.menuId);
-      if (!dbItem || dbItem.available === 0) {
-        socket.emit('error', { message: `Menu "${dbItem?.name || 'Pilihan'}" sedang habis / out of stock.` });
+      if (!dbItem || dbItem.available < item.quantity) {
+        socket.emit('error', { message: `Menu "${dbItem?.name || 'Pilihan'}" sisa ${dbItem?.available || 0} porsi.` });
         return;
       }
       authoritativeItems.push({
@@ -305,6 +305,12 @@ io.on('connection', (socket) => {
     };
 
     s.createOrder.run(orderId, tableId, JSON.stringify(order.items), order.notes, order.status, order.timestamp, order.total);
+
+    // Decrement stock
+    for (const item of authoritativeItems) {
+      s.decrementMenuStock.run(item.quantity, item.menuId);
+    }
+
 
     // Notify customer
     io.to(`table-${tableId}`).emit('order-placed', order);
@@ -494,13 +500,14 @@ app.post('/api/menu', auth.requireAdmin, (req, res) => {
     return res.status(400).json({ error: 'Input menu tidak valid' });
   }
 
-  const { name, price, category, image, description } = req.body;
+  const { name, price, category, image, description, available } = req.body;
   const id = `m_${Date.now()}`;
   const img = image && image.trim() !== '' ? image.trim() : '🍱';
   const desc = description ? description.trim() : '';
+  const initialStock = available !== undefined ? Number(available) : 100;
 
   try {
-    s.createMenuItem.run(id, name.trim(), price, category.trim(), img, desc, 1);
+    s.createMenuItem.run(id, name.trim(), price, category.trim(), img, desc, initialStock);
     broadcastMenuUpdated();
     const newMenu = s.getMenuItemById.get(id);
     res.status(201).json({ message: 'Menu berhasil ditambahkan', menu: newMenu });
@@ -522,12 +529,13 @@ app.put('/api/menu/:id', auth.requireAdmin, (req, res) => {
     return res.status(400).json({ error: 'Input menu tidak valid' });
   }
 
-  const { name, price, category, image, description } = req.body;
+  const { name, price, category, image, description, available } = req.body;
   const img = image && image.trim() !== '' ? image.trim() : existing.image;
   const desc = description !== undefined ? description.trim() : existing.description;
+  const newStock = available !== undefined ? Number(available) : existing.available;
 
   try {
-    s.updateMenuItem.run(name.trim(), price, category.trim(), img, desc, id);
+    s.updateMenuItem.run(name.trim(), price, category.trim(), img, desc, newStock, id);
     broadcastMenuUpdated();
     const updatedMenu = s.getMenuItemById.get(id);
     res.json({ message: 'Menu berhasil diperbarui', menu: updatedMenu });
@@ -538,18 +546,21 @@ app.put('/api/menu/:id', auth.requireAdmin, (req, res) => {
 });
 
 // Admin: Toggle menu availability (Out of Stock / Tersedia)
-app.patch('/api/menu/:id/toggle-available', auth.requireAdmin, (req, res) => {
+app.patch('/api/menu/:id/toggle-available', auth.requireAdmin, express.json(), (req, res) => {
   const { id } = req.params;
   const existing = s.getMenuItemById.get(id);
   if (!existing) {
     return res.status(404).json({ error: 'Menu tidak ditemukan' });
   }
 
-  const newStatus = existing.available === 1 ? 0 : 1;
+  let newStatus = req.body.available !== undefined 
+    ? Number(req.body.available) 
+    : (existing.available > 0 ? 0 : 100);
+
   try {
     s.toggleMenuAvailability.run(newStatus, id);
     broadcastMenuUpdated();
-    res.json({ message: `Status menu diubah menjadi ${newStatus === 1 ? 'Tersedia' : 'Stok Habis'}`, available: newStatus });
+    res.json({ message: `Stok menu diubah menjadi ${newStatus}`, available: newStatus });
   } catch (err) {
     console.error('Error toggling menu availability:', err);
     res.status(500).json({ error: 'Gagal mengubah status menu' });
