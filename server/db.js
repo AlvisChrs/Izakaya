@@ -43,6 +43,14 @@ function init() {
     CREATE INDEX IF NOT EXISTS idx_orders_table_status ON orders(table_id, status);
     CREATE INDEX IF NOT EXISTS idx_orders_timestamp ON orders(timestamp);
 
+    CREATE TABLE IF NOT EXISTS feedbacks (
+      id TEXT PRIMARY KEY,
+      table_id TEXT NOT NULL,
+      rating INTEGER NOT NULL,
+      comment TEXT,
+      created_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
@@ -149,6 +157,10 @@ function getStatements() {
       // Orders
       createOrder: db.prepare('INSERT INTO orders (id, table_id, items, notes, status, timestamp, total) VALUES (?, ?, ?, ?, ?, ?, ?)'),
       getOrdersByTable: db.prepare('SELECT * FROM orders WHERE table_id = ? ORDER BY timestamp'),
+
+      // Feedbacks
+      createFeedback: db.prepare('INSERT INTO feedbacks (id, table_id, rating, comment, created_at) VALUES (?, ?, ?, ?, ?)'),
+      getAllFeedbacks: db.prepare('SELECT * FROM feedbacks ORDER BY created_at DESC'),
       getPendingOrders: db.prepare("SELECT * FROM orders WHERE status != 'completed' ORDER BY timestamp"),
       getOrderById: db.prepare('SELECT * FROM orders WHERE id = ?'),
       updateOrderStatus: db.prepare('UPDATE orders SET status = ? WHERE id = ?'),

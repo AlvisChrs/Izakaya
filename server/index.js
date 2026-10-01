@@ -755,6 +755,26 @@ process.on('uncaughtException', (err) => {
   }
 });
 
+// Feedbacks
+app.get('/api/feedbacks', auth.requireAdmin, (req, res) => {
+  const feedbacks = s.getAllFeedbacks.all();
+  res.json(feedbacks);
+});
+
+app.post('/api/feedbacks', (req, res) => {
+  const { tableId, rating, comment } = req.body;
+  if (!tableId || !rating) return res.status(400).json({ error: 'Data tidak lengkap' });
+  
+  try {
+    const id = `f_${Date.now()}`;
+    s.createFeedback.run(id, tableId, rating, comment || '', Date.now());
+    res.status(201).json({ message: 'Terima kasih atas ulasan Anda!' });
+  } catch (e) {
+    console.error('Error saving feedback:', e);
+    res.status(500).json({ error: 'Gagal menyimpan ulasan' });
+  }
+});
+
 process.on('unhandledRejection', (reason) => {
   // Unhandled promise rejections are logged but do NOT shut down the server.
   // Socket handlers are already wrapped with wrapHandler; any rejection that

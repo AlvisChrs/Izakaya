@@ -258,6 +258,51 @@ function SalesReportTab({ orders, menu }) {
 }
 
 
+
+function FeedbacksTab({ adminToken }) {
+  const [feedbacks, setFeedbacks] = useState([]);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/feedbacks`, { headers: { "Authorization": `Bearer ${adminToken}` } })
+      .then(res => res.json())
+      .then(data => setFeedbacks(data))
+      .catch(err => console.error(err));
+  }, [adminToken]);
+
+  const renderStars = (rating) => {
+    return "⭐".repeat(rating) + "☆".repeat(5 - rating);
+  };
+
+  return (
+    <main className="main">
+      <div className="section-title-row">
+        <h2>💬 Ulasan Pelanggan</h2>
+      </div>
+      <div className="order-history-section">
+        {feedbacks.length === 0 ? (
+          <p>Belum ada ulasan.</p>
+        ) : (
+          <div style={{ display: "grid", gap: "1rem" }}>
+            {feedbacks.map(f => (
+              <div key={f.id} style={{ background: "var(--bg-card, #fff)", padding: "20px", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
+                  <strong>Meja {f.table_id.replace("table-", "")}</strong>
+                  <span style={{ color: "#888", fontSize: "0.9rem" }}>{new Date(f.created_at).toLocaleString("id-ID")}</span>
+                </div>
+                <div style={{ fontSize: "1.2rem", marginBottom: "10px" }}>{renderStars(f.rating)}</div>
+                <p style={{ color: "var(--text-color, #333)", fontStyle: f.comment ? "normal" : "italic" }}>
+                  {f.comment || "Tidak ada komentar."}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
+
+
 function App() {
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('adminTheme') === 'dark');
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -644,10 +689,14 @@ function App() {
         <button className={`tab-btn ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>
           📈 Laporan Penjualan
         </button>
+        <button className={`tab-btn ${activeTab === 'feedbacks' ? 'active' : ''}`} onClick={() => setActiveTab('feedbacks')}>
+          💬 Ulasan Pelanggan
+        </button>
       </div>
 
       {activeTab === 'history' && <OrderHistoryTab adminToken={adminToken} />}
       {activeTab === 'reports' && <SalesReportTab orders={orders} menu={menu} />}
+      {activeTab === 'feedbacks' && <FeedbacksTab adminToken={adminToken} />}
       
       {activeTab === 'dashboard' && (
       <main className="main">

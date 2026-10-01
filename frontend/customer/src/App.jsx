@@ -31,6 +31,10 @@ function App() {
   const [cashRequested, setCashRequested] = useState(false)
   const [isLightMode, setIsLightMode] = useState(() => localStorage.getItem('customerTheme') === 'light')
 
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false)
+  const [feedbackRating, setFeedbackRating] = useState(5)
+  const [feedbackComment, setFeedbackComment] = useState('')
+
   useEffect(() => {
     if (isLightMode) {
       document.body.classList.add('light-theme');
@@ -84,6 +88,7 @@ function App() {
       setPaymentMethod(null)
       setCashRequested(false)
       setOrders(prev => prev.map(o => ({ ...o, status: 'completed' })))
+      setShowFeedbackModal(true)
     })
 
     newSocket.on('cash-payment-requested', () => {
@@ -428,6 +433,48 @@ function App() {
           </section>
         </div>
       </main>
+
+      
+      {/* Feedback Modal */}
+      {showFeedbackModal && (
+        <div className="bill-modal-overlay" onClick={() => setShowFeedbackModal(false)}>
+          <div className="bill-modal" onClick={e => e.stopPropagation()} style={{ textAlign: "center" }}>
+            <h2>Terima Kasih! 🎉</h2>
+            <p style={{ margin: "10px 0 20px" }}>Pesanan Anda telah selesai. Bagaimana pengalaman Anda?</p>
+            <div style={{ fontSize: "2rem", marginBottom: "20px", display: "flex", justifyContent: "center", gap: "10px", cursor: "pointer" }}>
+              {[1, 2, 3, 4, 5].map(star => (
+                <span key={star} onClick={() => setFeedbackRating(star)} style={{ color: star <= feedbackRating ? "#fbbf24" : "#e5e7eb" }}>★</span>
+              ))}
+            </div>
+            <textarea
+              rows="3"
+              placeholder="Berikan saran atau kritik Anda (opsional)..."
+              value={feedbackComment}
+              onChange={e => setFeedbackComment(e.target.value)}
+              style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #ccc", marginBottom: "20px" }}
+            />
+            <button
+              className="bill-btn"
+              style={{ width: "100%" }}
+              onClick={async () => {
+                try {
+                  await fetch(`${API_URL}/api/feedbacks`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ tableId, rating: feedbackRating, comment: feedbackComment })
+                  });
+                  setShowFeedbackModal(false);
+                } catch (e) {
+                  setShowFeedbackModal(false);
+                }
+              }}
+            >
+              Kirim Ulasan
+            </button>
+          </div>
+        </div>
+      )}
+
 
       {/* Call Waiter Modal */}
       {showWaiterModal && (
