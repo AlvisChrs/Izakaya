@@ -57,7 +57,21 @@ function init() {
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
+
+  // Initialize Default Settings
+  const settingsCount = db.prepare('SELECT COUNT(*) as c FROM settings').get().c;
+  if (settingsCount === 0) {
+    const insertSetting = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)');
+    insertSetting.run('restaurant_name', 'Izakaya');
+    insertSetting.run('tax_rate', '11');
+    insertSetting.run('service_charge', '0');
+  }
 
   // Column migration for existing DB
   try {
@@ -166,6 +180,10 @@ function getStatements() {
       getAllStaff: db.prepare('SELECT id, username, role FROM users'),
       createStaff: db.prepare('INSERT INTO users (id, username, password_hash, role) VALUES (?, ?, ?, ?)'),
       deleteStaff: db.prepare('DELETE FROM users WHERE id = ?'),
+      
+      // Settings
+      getAllSettings: db.prepare('SELECT key, value FROM settings'),
+      updateSetting: db.prepare('UPDATE settings SET value = ? WHERE key = ?'),
       
       getPendingOrders: db.prepare("SELECT * FROM orders WHERE status != 'completed' ORDER BY timestamp"),
       getOrderById: db.prepare('SELECT * FROM orders WHERE id = ?'),

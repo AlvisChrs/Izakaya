@@ -18,6 +18,18 @@ const bcrypt = require('bcryptjs');
 db.init();
 const s = db.getStatements();
 
+function getCurrentSettings() {
+  try {
+    const settingsArr = s.getAllSettings.all();
+    const settings = {};
+    settingsArr.forEach(st => settings[st.key] = st.value);
+    return settings;
+  } catch (e) {
+    return { tax_rate: "11", service_charge: "0", restaurant_name: "Izakaya" };
+  }
+}
+
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -362,8 +374,14 @@ io.on('connection', (socket) => {
       total: completedOrders.reduce((sum, o) => sum + o.total, 0),
       timestamp: Date.now()
     };
-    bill.tax = Math.round(bill.subtotal * 0.11); // PPN 11%
-    bill.total = bill.subtotal + bill.tax;
+    const settings = getCurrentSettings();
+    const taxRate = parseFloat(settings.tax_rate || 0) / 100;
+    const serviceRate = parseFloat(settings.service_charge || 0) / 100;
+    bill.tax = Math.round(bill.subtotal * taxRate);
+    bill.service_charge = Math.round(bill.subtotal * serviceRate);
+    bill.tax_rate_str = settings.tax_rate;
+    bill.service_rate_str = settings.service_charge;
+    bill.total = bill.subtotal + bill.tax + bill.service_charge;
 
     io.to(`table-${tableId}`).emit('bill-generated', bill);
     console.log(`Bill generated for table ${table.number}`);
@@ -418,8 +436,14 @@ io.on('connection', (socket) => {
       total: completedOrders.reduce((sum, o) => sum + o.total, 0),
       timestamp: Date.now()
     };
-    bill.tax = Math.round(bill.subtotal * 0.11);
-    bill.total = bill.subtotal + bill.tax;
+    const settings = getCurrentSettings();
+    const taxRate = parseFloat(settings.tax_rate || 0) / 100;
+    const serviceRate = parseFloat(settings.service_charge || 0) / 100;
+    bill.tax = Math.round(bill.subtotal * taxRate);
+    bill.service_charge = Math.round(bill.subtotal * serviceRate);
+    bill.tax_rate_str = settings.tax_rate;
+    bill.service_rate_str = settings.service_charge;
+    bill.total = bill.subtotal + bill.tax + bill.service_charge;
 
     socket.emit('admin-bill-data', { tableId, bill });
   }));
@@ -892,6 +916,34 @@ app.delete("/api/staff/:id", auth.requireAdmin, (req, res) => {
   } catch (e) {
     console.error("Error deleting staff:", e);
     res.status(500).json({ error: "Gagal menghapus staf" });
+  }
+});
+
+
+
+// Settings API
+app.get("/api/settings", (req, res) => {
+  try {
+    const settingsArr = s.getAllSettings.all();
+    const settings = {};
+    settingsArr.forEach(st => settings[st.key] = st.value);
+    res.json(settings);
+  } catch (e) {
+    res.status(500).json({ error: "Failed to fetch settings" });
+  }
+});
+
+app.put("/api/settings", auth.requireAdmin, express.json(), (req, res) => {
+  const newSettings = req.body;
+  try {
+    for (const [key, value] of Object.entries(newSettings)) {
+      s.updateSetting.run(String(value), key);
+    }
+    io.emit("settings-updated", newSettings);
+    res.json({ message: "Pengaturan berhasil diperbarui" });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Gagal memperbarui pengaturan" });
   }
 });
 

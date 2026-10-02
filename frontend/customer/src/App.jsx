@@ -378,7 +378,8 @@ function App() {
                   </div>
                   <div className="bill-summary">
                     <div><span>Subtotal</span><span>Rp {bill.subtotal.toLocaleString('id-ID')}</span></div>
-                    <div><span>PPN 11%</span><span>Rp {bill.tax.toLocaleString('id-ID')}</span></div>
+                    {bill.service_charge > 0 && <div><span>Service {bill.service_rate_str}%</span><span>Rp {bill.service_charge.toLocaleString("id-ID")}</span></div>}
+                      <div><span>PPN {bill.tax_rate_str}%</span><span>Rp {bill.tax.toLocaleString("id-ID")}</span></div>
                     <div className="bill-total"><span>Total</span><span>Rp {bill.total.toLocaleString('id-ID')}</span></div>
                   </div>
                   

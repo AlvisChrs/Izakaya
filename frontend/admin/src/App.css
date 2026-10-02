@@ -968,3 +968,57 @@ section h2 {
   background: #e5e7eb;
 }
 
+
+/* Thermal Receipt Print Styles */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-receipt-layout, .print-receipt-layout * {
+    visibility: visible;
+  }
+  .print-receipt-layout {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 58mm; /* standard thermal receipt width */
+    margin: 0;
+    padding: 0;
+    font-family: "Courier New", Courier, monospace, sans-serif !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+    color: #000 !important;
+  }
+
+  .receipt-header h2 {
+    font-size: 16px !important;
+    margin: 0 0 5px 0 !important;
+  }
+  
+  .receipt-header p {
+    font-size: 12px !important;
+    margin: 2px 0 !important;
+  }
+
+  .receipt-divider {
+    font-size: 12px !important;
+    white-space: pre;
+    overflow: hidden;
+  }
+
+  .receipt-item-row {
+    font-size: 12px !important;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .receipt-summary .receipt-row {
+    font-size: 12px !important;
+  }
+
+  .receipt-summary .receipt-total {
+    font-size: 14px !important;
+    font-weight: bold !important;
+  }
+}
+

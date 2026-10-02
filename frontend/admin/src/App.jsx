@@ -574,6 +574,82 @@ function StaffTab({ adminToken }) {
 }
 
 
+
+function SettingsTab({ adminToken }) {
+  const [settings, setSettings] = useState({ restaurant_name: "", tax_rate: "", service_charge: "" });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/settings`)
+      .then(res => res.json())
+      .then(data => setSettings({
+        restaurant_name: data.restaurant_name || "",
+        tax_rate: data.tax_rate || "",
+        service_charge: data.service_charge || ""
+      }))
+      .catch(console.error);
+  }, []);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${adminToken}` },
+        body: JSON.stringify(settings)
+      });
+      if (!res.ok) throw new Error("Gagal menyimpan pengaturan");
+      alert("Pengaturan berhasil disimpan!");
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="main" style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "20px" }}>
+      <div style={{ background: "var(--bg-card, #fff)", padding: "30px", borderRadius: "12px", border: "1px solid #e5e7eb", width: "100%", maxWidth: "600px" }}>
+        <h2 style={{ marginBottom: "20px", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>⚙️ Pengaturan Restoran</h2>
+        <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+          <div>
+            <label style={{ fontWeight: "bold", marginBottom: "5px", display: "block" }}>Nama Restoran</label>
+            <input 
+              type="text" 
+              value={settings.restaurant_name} 
+              onChange={e => setSettings({...settings, restaurant_name: e.target.value})}
+              style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
+            />
+          </div>
+          <div>
+            <label style={{ fontWeight: "bold", marginBottom: "5px", display: "block" }}>Pajak / PPN (%)</label>
+            <input 
+              type="number" 
+              value={settings.tax_rate} 
+              onChange={e => setSettings({...settings, tax_rate: e.target.value})}
+              style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
+            />
+          </div>
+          <div>
+            <label style={{ fontWeight: "bold", marginBottom: "5px", display: "block" }}>Service Charge (%)</label>
+            <input 
+              type="number" 
+              value={settings.service_charge} 
+              onChange={e => setSettings({...settings, service_charge: e.target.value})}
+              style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
+            />
+          </div>
+          <button type="submit" disabled={loading} style={{ background: "#10b981", color: "#fff", padding: "12px", borderRadius: "6px", border: "none", cursor: "pointer", marginTop: "10px", fontWeight: "bold", fontSize: "1.1rem" }}>
+            {loading ? "Menyimpan..." : "💾 Simpan Pengaturan"}
+          </button>
+        </form>
+      </div>
+    </main>
+  );
+}
+
+
 function App() {
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('adminTheme') === 'dark');
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -980,6 +1056,12 @@ function App() {
             👥 Manajemen Staf
           </button>
         )}
+        {adminRole === 'admin' && (
+          <button className={`tab-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+            ⚙️ Pengaturan
+          </button>
+        )}
+
 
       </div>
 
@@ -988,6 +1070,7 @@ function App() {
       {activeTab === 'feedbacks' && <FeedbacksTab adminToken={adminToken} />}
       {activeTab === 'pos' && <POSTab adminToken={adminToken} menu={menu} categories={categories} />}
       {activeTab === 'staff' && <StaffTab adminToken={adminToken} />}
+      {activeTab === 'settings' && <SettingsTab adminToken={adminToken} />}
       
       {activeTab === 'dashboard' && (
       <main className="main">
@@ -1065,16 +1148,31 @@ function App() {
                   </div>
 
                   {tableOrders.length > 0 && (
-                    <div className="table-orders">
-                      {tableOrders.map(order => (
-                        <div key={order.id} className="mini-order">
-                          <span>#{order.id.slice(0, 6)}</span>
-                          <span className="mini-status" style={{ backgroundColor: getStatusColor(order.status) }}>
-                            {getStatusLabel(order.status)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                    <>
+                      {adminRole !== 'kasir' && getTableOrders(table.id).length > 0 && (
+                        <button onClick={(e) => {
+                          e.stopPropagation();
+                          const pending = getTableOrders(table.id).flatMap(o => JSON.parse(o.items));
+                          setAdminBillData({
+                            isKitchen: true,
+                            bill: { tableNumber: table.number, items: pending, timestamp: Date.now() }
+                          });
+                          setTimeout(() => window.print(), 200);
+                        }} style={{ width: '100%', marginTop: '5px', padding: '8px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                          👨‍🍳 Cetak Pesanan Dapur
+                        </button>
+                      )}
+                      <div className="table-orders">
+                        {tableOrders.map(order => (
+                          <div key={order.id} className="mini-order">
+                            <span>#{order.id.slice(0, 6)}</span>
+                            <span className="mini-status" style={{ backgroundColor: getStatusColor(order.status) }}>
+                              {getStatusLabel(order.status)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
                   )}
 
                   <div className="table-actions">
@@ -1301,7 +1399,8 @@ function App() {
                   </div>
                   <div className="bill-summary">
                     <div><span>Subtotal</span><span>Rp {adminBillData.bill.subtotal.toLocaleString('id-ID')}</span></div>
-                    <div><span>PPN 11%</span><span>Rp {adminBillData.bill.tax.toLocaleString('id-ID')}</span></div>
+                    {adminBillData.bill.service_charge > 0 && <div><span>Service {adminBillData.bill.service_rate_str}%</span><span>Rp {adminBillData.bill.service_charge.toLocaleString("id-ID")}</span></div>}
+                    <div><span>PPN {adminBillData.bill.tax_rate_str}%</span><span>Rp {adminBillData.bill.tax.toLocaleString("id-ID")}</span></div>
                     <div className="bill-total"><span>Total</span><span>Rp {adminBillData.bill.total.toLocaleString('id-ID')}</span></div>
                   </div>
                   
@@ -1329,7 +1428,18 @@ function App() {
             <p>{new Date().toLocaleString('id-ID')}</p>
           </div>
           <div className="receipt-divider">--------------------------------</div>
-          <div className="receipt-items">
+          {adminBillData.isKitchen ? (
+            <div className="receipt-items">
+              <h3 style={{textAlign: "center", marginBottom: "10px"}}>DAPUR / KITCHEN</h3>
+              {adminBillData.bill.items.map((item, i) => (
+                <div key={i} className="receipt-item">
+                  <div style={{fontSize: "16px", fontWeight: "bold"}}>[ {item.quantity}x ] {item.name}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="receipt-items">
             {adminBillData.bill.items.map((item, i) => (
               <div key={i} className="receipt-item">
                 <div>{item.name}</div>
@@ -1347,9 +1457,15 @@ function App() {
               <span>Rp {adminBillData.bill.subtotal.toLocaleString('id-ID')}</span>
             </div>
             <div className="receipt-row">
-              <span>PPN 11%</span>
-              <span>Rp {adminBillData.bill.tax.toLocaleString('id-ID')}</span>
+              <span>PPN {adminBillData.bill.tax_rate_str}%</span>
+              <span>Rp {adminBillData.bill.tax.toLocaleString("id-ID")}</span>
             </div>
+            {adminBillData.bill.service_charge > 0 && (
+              <div className="receipt-row">
+                <span>SC {adminBillData.bill.service_rate_str}%</span>
+                <span>Rp {adminBillData.bill.service_charge.toLocaleString("id-ID")}</span>
+              </div>
+            )}
             <div className="receipt-row receipt-total">
               <span>TOTAL</span>
               <span>Rp {adminBillData.bill.total.toLocaleString('id-ID')}</span>
@@ -1359,6 +1475,8 @@ function App() {
           <div className="receipt-footer">
             <p>Terima kasih atas kunjungan Anda!</p>
           </div>
+          </>
+)}
         </div>
       )}
     </div>
