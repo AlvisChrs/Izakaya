@@ -29,11 +29,12 @@ function LoginPage({ onLogin }) {
       
       const data = await res.json();
       
-      if (res.ok && data.role === 'admin') {
+      if (res.ok) {
         localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
-        onLogin(data.token);
+        localStorage.setItem('ADMIN_ROLE', data.role);
+        onLogin({ token: data.token, role: data.role });
       } else {
-        setError(data.error || 'Akses ditolak: Anda bukan admin');
+        setError(data.error || 'Akses ditolak');
       }
     } catch (err) {
       console.error(err);
@@ -303,6 +304,276 @@ function FeedbacksTab({ adminToken }) {
 }
 
 
+
+function POSTab({ adminToken, menu, categories }) {
+  const [cart, setCart] = useState([]);
+  const [activeCategory, setActiveCategory] = useState(categories[0] || "");
+  const [tableName, setTableName] = useState("Walk-in / Kasir");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const addToCart = (item) => {
+    if (item.available === 0) return;
+    setCart((prev) => {
+      const existing = prev.find((i) => i.menuId === item.id);
+      if (existing) {
+        return prev.map((i) =>
+          i.menuId === item.id ? { ...i, quantity: i.quantity + 1 } : i
+        );
+      }
+      return [
+        ...prev,
+        { menuId: item.id, name: item.name, price: item.price, quantity: 1, notes: "" },
+      ];
+    });
+  };
+
+  const updateQuantity = (menuId, delta) => {
+    setCart((prev) => {
+      const item = prev.find((i) => i.menuId === menuId);
+      if (!item) return prev;
+      const newQty = item.quantity + delta;
+      if (newQty <= 0) return prev.filter((i) => i.menuId !== menuId);
+      return prev.map((i) =>
+        i.menuId === menuId ? { ...i, quantity: newQty } : i
+      );
+    });
+  };
+
+  const submitOrder = async () => {
+    if (cart.length === 0) {
+      alert("Keranjang kosong!");
+      return;
+    }
+    if (!tableName.trim()) {
+      alert("Nama meja / pemesan tidak boleh kosong");
+      return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+      // Create a specific API call or just simulate socket place-order
+      const res = await fetch(`${API_URL}/api/pos/order`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({
+          tableId: `pos-${Date.now()}`,
+          tableName: tableName,
+          items: cart,
+          notes: "POS Order"
+        }),
+      });
+
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || "Gagal membuat pesanan");
+      }
+
+      alert("Pesanan berhasil dibuat!");
+      setCart([]);
+      setTableName("Walk-in / Kasir");
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const filteredMenu = menu.filter((m) => m.category === activeCategory);
+  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  return (
+    <main className="main" style={{ display: "flex", gap: "20px", height: "calc(100vh - 100px)" }}>
+      {/* Menu Selection Area */}
+      <div style={{ flex: "2", display: "flex", flexDirection: "column", background: "var(--bg-card, #fff)", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden" }}>
+        <div className="menu-categories" style={{ overflowX: "auto", padding: "15px", borderBottom: "1px solid #eee", whiteSpace: "nowrap" }}>
+          {categories.map((c) => (
+            <button
+              key={c}
+              className={`category-btn ${activeCategory === c ? "active" : ""}`}
+              onClick={() => setActiveCategory(c)}
+              style={{ padding: "8px 16px", marginRight: "10px", borderRadius: "20px", border: "none", cursor: "pointer", background: activeCategory === c ? "#ef4444" : "#f1f5f9", color: activeCategory === c ? "#fff" : "#333" }}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+        
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "15px", alignContent: "start" }}>
+          {filteredMenu.map((item) => (
+            <div key={item.id} onClick={() => addToCart(item)} style={{ cursor: item.available === 0 ? "not-allowed" : "pointer", opacity: item.available === 0 ? 0.5 : 1, border: "1px solid #eee", borderRadius: "10px", padding: "10px", textAlign: "center", transition: "transform 0.2s" }} onMouseOver={e => { if(item.available !== 0) e.currentTarget.style.transform = "scale(1.05)" }} onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}>
+              <div style={{ fontSize: "2rem", marginBottom: "10px" }}>{item.image && (item.image.startsWith("http") || item.image.startsWith("/uploads")) ? <img src={item.image} style={{ width: "100%", height: "80px", objectFit: "cover", borderRadius: "8px" }}/> : item.image}</div>
+              <div style={{ fontWeight: "600", fontSize: "0.9rem", marginBottom: "5px" }}>{item.name}</div>
+              <div style={{ color: "#ef4444", fontSize: "0.85rem", fontWeight: "bold" }}>Rp {item.price.toLocaleString("id-ID")}</div>
+              {item.available === 0 && <div style={{ color: "red", fontSize: "0.75rem", marginTop: "5px" }}>Habis</div>}
+              {item.available > 0 && <div style={{ color: "#888", fontSize: "0.75rem", marginTop: "5px" }}>Stok: {item.available}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Cart Area */}
+      <div style={{ flex: "1", background: "var(--bg-card, #fff)", borderRadius: "12px", border: "1px solid #e5e7eb", display: "flex", flexDirection: "column", padding: "20px" }}>
+        <h3 style={{ marginBottom: "15px", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>🛒 Keranjang POS</h3>
+        
+        <div style={{ marginBottom: "15px" }}>
+          <label style={{ fontSize: "0.9rem", color: "#666", marginBottom: "5px", display: "block" }}>Nama / Meja Pemesan</label>
+          <input 
+            type="text" 
+            value={tableName} 
+            onChange={(e) => setTableName(e.target.value)}
+            style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #ddd" }}
+          />
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", marginBottom: "15px" }}>
+          {cart.length === 0 ? (
+            <p style={{ textAlign: "center", color: "#888", marginTop: "20px" }}>Keranjang kosong</p>
+          ) : (
+            cart.map((c) => (
+              <div key={c.menuId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px dashed #eee" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: "600", fontSize: "0.9rem" }}>{c.name}</div>
+                  <div style={{ color: "#888", fontSize: "0.8rem" }}>Rp {c.price.toLocaleString("id-ID")}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <button onClick={() => updateQuantity(c.menuId, -1)} style={{ width: "25px", height: "25px", borderRadius: "50%", border: "1px solid #ccc", background: "#fff", cursor: "pointer" }}>-</button>
+                  <span style={{ fontSize: "0.9rem", fontWeight: "600" }}>{c.quantity}</span>
+                  <button onClick={() => updateQuantity(c.menuId, 1)} style={{ width: "25px", height: "25px", borderRadius: "50%", border: "1px solid #ccc", background: "#fff", cursor: "pointer" }}>+</button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={{ borderTop: "2px dashed #eee", paddingTop: "15px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "1.1rem", fontWeight: "bold", marginBottom: "15px" }}>
+            <span>Total</span>
+            <span style={{ color: "#ef4444" }}>Rp {total.toLocaleString("id-ID")}</span>
+          </div>
+          <button 
+            onClick={submitOrder}
+            disabled={isSubmitting || cart.length === 0}
+            style={{ width: "100%", padding: "15px", background: (isSubmitting || cart.length === 0) ? "#ccc" : "#10b981", color: "#fff", border: "none", borderRadius: "8px", fontSize: "1rem", fontWeight: "bold", cursor: (isSubmitting || cart.length === 0) ? "not-allowed" : "pointer" }}
+          >
+            {isSubmitting ? "Memproses..." : "Buat Pesanan"}
+          </button>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+
+
+function StaffTab({ adminToken }) {
+  const [staffList, setStaffList] = useState([]);
+  const [form, setForm] = useState({ username: "", password: "", role: "kasir" });
+  const [loading, setLoading] = useState(false);
+
+  const fetchStaff = () => {
+    fetch(`${API_URL}/api/staff`, { headers: { "Authorization": `Bearer ${adminToken}` } })
+      .then(res => res.json())
+      .then(data => setStaffList(data))
+      .catch(err => console.error(err));
+  };
+
+  useEffect(() => {
+    fetchStaff();
+  }, [adminToken]);
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/staff`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${adminToken}` },
+        body: JSON.stringify(form)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal");
+      alert("Staf berhasil ditambahkan");
+      setForm({ username: "", password: "", role: "kasir" });
+      fetchStaff();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id, username) => {
+    if (!confirm(`Hapus akun ${username}?`)) return;
+    try {
+      const res = await fetch(`${API_URL}/api/staff/${id}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${adminToken}` }
+      });
+      if (!res.ok) throw new Error("Gagal menghapus");
+      fetchStaff();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  return (
+    <main className="main" style={{ display: "flex", gap: "20px" }}>
+      <div style={{ flex: 1, background: "var(--bg-card, #fff)", padding: "20px", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
+        <h3>Tambah Staf Baru</h3>
+        <form onSubmit={handleAdd} style={{ marginTop: "15px", display: "flex", flexDirection: "column", gap: "10px" }}>
+          <div>
+            <label>Username</label>
+            <input type="text" required value={form.username} onChange={e => setForm({...form, username: e.target.value})} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #ccc", marginTop: "5px" }} />
+          </div>
+          <div>
+            <label>Password</label>
+            <input type="password" required value={form.password} onChange={e => setForm({...form, password: e.target.value})} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #ccc", marginTop: "5px" }} />
+          </div>
+          <div>
+            <label>Role</label>
+            <select value={form.role} onChange={e => setForm({...form, role: e.target.value})} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #ccc", marginTop: "5px" }}>
+              <option value="kasir">Kasir</option>
+              <option value="dapur">Dapur</option>
+              <option value="admin">Superadmin</option>
+            </select>
+          </div>
+          <button type="submit" disabled={loading} style={{ background: "#3b82f6", color: "#fff", padding: "10px", borderRadius: "6px", border: "none", cursor: "pointer", marginTop: "10px" }}>
+            {loading ? "Menambahkan..." : "Tambah Staf"}
+          </button>
+        </form>
+      </div>
+
+      <div style={{ flex: 2, background: "var(--bg-card, #fff)", padding: "20px", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
+        <h3>Daftar Staf</h3>
+        <table style={{ width: "100%", marginTop: "15px", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
+              <th style={{ padding: "10px", borderBottom: "1px solid #ccc" }}>Username</th>
+              <th style={{ padding: "10px", borderBottom: "1px solid #ccc" }}>Role</th>
+              <th style={{ padding: "10px", borderBottom: "1px solid #ccc" }}>Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {staffList.map(s => (
+              <tr key={s.id}>
+                <td style={{ padding: "10px", borderBottom: "1px solid #eee" }}>{s.username}</td>
+                <td style={{ padding: "10px", borderBottom: "1px solid #eee", textTransform: "capitalize" }}>{s.role}</td>
+                <td style={{ padding: "10px", borderBottom: "1px solid #eee" }}>
+                  <button onClick={() => handleDelete(s.id, s.username)} style={{ background: "#ef4444", color: "#fff", border: "none", padding: "5px 10px", borderRadius: "4px", cursor: "pointer" }}>Hapus</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </main>
+  );
+}
+
+
 function App() {
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('adminTheme') === 'dark');
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -318,6 +589,7 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [adminToken, setAdminToken] = useState(() => localStorage.getItem(ADMIN_TOKEN_KEY));
+    const [adminRole, setAdminRole] = useState(() => localStorage.getItem('ADMIN_ROLE') || 'admin');
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [editingMenu, setEditingMenu] = useState(null);
   const [menuForm, setMenuForm] = useState({
@@ -692,11 +964,30 @@ function App() {
         <button className={`tab-btn ${activeTab === 'feedbacks' ? 'active' : ''}`} onClick={() => setActiveTab('feedbacks')}>
           💬 Ulasan Pelanggan
         </button>
+        
+        {adminRole !== 'dapur' && (
+          <button className={`tab-btn ${activeTab === 'pos' ? 'active' : ''}`} onClick={() => setActiveTab('pos')}>
+            🛒 Kasir (POS)
+          </button>
+        )}
+        {adminRole !== 'dapur' && adminRole !== 'kasir' && (
+          <button className={`tab-btn ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>
+            📈 Laporan Penjualan
+          </button>
+        )}
+        {adminRole !== 'dapur' && adminRole !== 'kasir' && (
+          <button className={`tab-btn ${activeTab === 'staff' ? 'active' : ''}`} onClick={() => setActiveTab('staff')}>
+            👥 Manajemen Staf
+          </button>
+        )}
+
       </div>
 
       {activeTab === 'history' && <OrderHistoryTab adminToken={adminToken} />}
       {activeTab === 'reports' && <SalesReportTab orders={orders} menu={menu} />}
       {activeTab === 'feedbacks' && <FeedbacksTab adminToken={adminToken} />}
+      {activeTab === 'pos' && <POSTab adminToken={adminToken} menu={menu} categories={categories} />}
+      {activeTab === 'staff' && <StaffTab adminToken={adminToken} />}
       
       {activeTab === 'dashboard' && (
       <main className="main">

@@ -775,6 +775,127 @@ app.post('/api/feedbacks', (req, res) => {
   }
 });
 
+
+// POS / Kasir Order endpoint
+app.post("/api/pos/order", auth.requireAdmin, express.json(), (req, res) => {
+  const { tableId, tableName, items, notes } = req.body;
+  if (!items || !items.length) return res.status(400).json({ error: "Keranjang kosong" });
+  
+  const allMenuItems = s.getAllMenu.all();
+  const orderId = `o_${Date.now()}`;
+  
+  const authoritativeItems = [];
+  for (const item of items) {
+    const dbItem = allMenuItems.find(m => m.id === item.menuId);
+    if (!dbItem || dbItem.available < item.quantity) {
+      return res.status(400).json({ error: `Menu "${dbItem?.name || "Pilihan"}" sisa ${dbItem?.available || 0} porsi.` });
+    }
+    authoritativeItems.push({
+      menuId: dbItem.id,
+      name: dbItem.name,
+      price: dbItem.price,
+      quantity: item.quantity
+    });
+  }
+  
+  const total = authoritativeItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const status = "pending";
+  const timestamp = Date.now();
+  
+  try {
+    s.createOrder.run(orderId, tableId, JSON.stringify(authoritativeItems), notes || "POS Order", status, timestamp, total);
+    
+    // Decrement stock
+    for (const item of authoritativeItems) {
+      s.decrementMenuStock.run(item.quantity, item.menuId);
+    }
+    
+    const order = { id: orderId, tableId, tableNumber: tableName, items: authoritativeItems, notes: notes || "POS Order", status, timestamp, total };
+    
+    // Notify kitchen
+    io.to("kitchen").emit("order-placed", order);
+    broadcastMenuUpdated();
+    
+    res.json({ message: "Pesanan berhasil dibuat", order });
+  } catch (e) {
+    console.error("Error POS order:", e);
+    res.status(500).json({ error: "Gagal memproses pesanan POS" });
+  }
+});
+
+
+
+// Staff Management
+app.get("/api/staff", auth.requireAdmin, (req, res) => {
+  const users = s.getAllStaff.all();
+  res.json(users);
+});
+
+app.post("/api/staff", auth.requireAdmin, express.json(), (req, res) => {
+  const { username, password, role } = req.body;
+  if (!username || !password || !role) return res.status(400).json({ error: "Data tidak lengkap" });
+  
+  try {
+    const hash = bcrypt.hashSync(password, 10);
+    const id = `u_${Date.now()}`;
+    s.createStaff.run(id, username, hash, role);
+    res.status(201).json({ message: "Staf berhasil ditambahkan" });
+  } catch (e) {
+    if (e.message.includes("UNIQUE constraint failed")) {
+      return res.status(400).json({ error: "Username sudah ada" });
+    }
+    console.error("Error creating staff:", e);
+    res.status(500).json({ error: "Gagal menambah staf" });
+  }
+});
+
+app.delete("/api/staff/:id", auth.requireAdmin, (req, res) => {
+  try {
+    s.deleteStaff.run(req.params.id);
+    res.json({ message: "Staf berhasil dihapus" });
+  } catch (e) {
+    console.error("Error deleting staff:", e);
+    res.status(500).json({ error: "Gagal menghapus staf" });
+  }
+});
+
+
+
+// Staff Management
+app.get("/api/staff", auth.requireAdmin, (req, res) => {
+  const users = s.getAllStaff.all();
+  res.json(users);
+});
+
+app.post("/api/staff", auth.requireAdmin, express.json(), (req, res) => {
+  const { username, password, role } = req.body;
+  if (!username || !password || !role) return res.status(400).json({ error: "Data tidak lengkap" });
+  
+  try {
+    const hash = bcrypt.hashSync(password, 10);
+    const id = `u_${Date.now()}`;
+    s.createStaff.run(id, username, hash, role);
+    res.status(201).json({ message: "Staf berhasil ditambahkan" });
+  } catch (e) {
+    if (e.message.includes("UNIQUE constraint failed")) {
+      return res.status(400).json({ error: "Username sudah ada" });
+    }
+    console.error("Error creating staff:", e);
+    res.status(500).json({ error: "Gagal menambah staf" });
+  }
+});
+
+app.delete("/api/staff/:id", auth.requireAdmin, (req, res) => {
+  try {
+    s.deleteStaff.run(req.params.id);
+    res.json({ message: "Staf berhasil dihapus" });
+  } catch (e) {
+    console.error("Error deleting staff:", e);
+    res.status(500).json({ error: "Gagal menghapus staf" });
+  }
+});
+
+
 process.on('unhandledRejection', (reason) => {
   // Unhandled promise rejections are logged but do NOT shut down the server.
   // Socket handlers are already wrapped with wrapHandler; any rejection that

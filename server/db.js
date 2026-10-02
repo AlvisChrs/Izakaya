@@ -161,6 +161,12 @@ function getStatements() {
       // Feedbacks
       createFeedback: db.prepare('INSERT INTO feedbacks (id, table_id, rating, comment, created_at) VALUES (?, ?, ?, ?, ?)'),
       getAllFeedbacks: db.prepare('SELECT * FROM feedbacks ORDER BY created_at DESC'),
+
+      // Staff
+      getAllStaff: db.prepare('SELECT id, username, role FROM users'),
+      createStaff: db.prepare('INSERT INTO users (id, username, password_hash, role) VALUES (?, ?, ?, ?)'),
+      deleteStaff: db.prepare('DELETE FROM users WHERE id = ?'),
+      
       getPendingOrders: db.prepare("SELECT * FROM orders WHERE status != 'completed' ORDER BY timestamp"),
       getOrderById: db.prepare('SELECT * FROM orders WHERE id = ?'),
       updateOrderStatus: db.prepare('UPDATE orders SET status = ? WHERE id = ?'),
