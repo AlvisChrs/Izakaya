@@ -410,7 +410,7 @@ io.on('connection', (socket) => {
       io.to(`table-${tableId}`).emit('cash-payment-requested');
       console.log(`Cash payment requested by Table ${table.number}`);
     } else if (paymentMethod === 'qris') {
-      s.markTableOrdersCompleted.run(tableId);
+      s.markTableOrdersCompleted.run(method, tableId);
       io.to(`table-${tableId}`).emit('payment-confirmed');
       io.to('kitchen').emit('orders-completed', { tableId, tableNumber: table.number });
       console.log(`QRIS Payment confirmed for table ${table.number}`);
@@ -449,7 +449,9 @@ io.on('connection', (socket) => {
   }));
 
   // Admin manually confirms payment
-  socket.on('admin-confirm-payment', wrapHandler(socket, 'admin-confirm-payment', (tableId) => {
+  socket.on('admin-confirm-payment', wrapHandler(socket, 'admin-confirm-payment', (data) => {
+      const tableId = typeof data === 'object' ? data.tableId : data;
+      const method = typeof data === 'object' && data.method ? data.method : 'Tunai';
     if (socket.data.staffRole !== 'admin' && socket.data.staffRole !== 'kitchen') {
       socket.emit('error', { message: 'Unauthorized: Staff token required' });
       return;
@@ -609,7 +611,39 @@ app.delete('/api/menu/:id', auth.requireAdmin, (req, res) => {
   }
 });
 
-app.get('/api/tables', auth.requireAdmin, (req, res) => {
+
+app.post('/api/tables', auth.requireAdmin, (req, res) => {
+  const { number } = req.body;
+  if (!number) return res.status(400).json({ error: 'Number required' });
+  const id = uuidv4();
+  const token = uuidv4();
+  try {
+    const s = require('./db').getStatements();
+    s.createTable.run(id, parseInt(number), token);
+    const QRCode = require('qrcode');
+    const qrData = JSON.stringify({ tableId: id, tableNumber: number, url: `${process.env.PUBLIC_URL || 'http://localhost:3000'}/?t=${id}&k=${token}` });
+    QRCode.toDataURL(qrData, (err, url) => {
+      if (!err) s.updateTableQrCode.run(url, id);
+      io.emit('table-updated');
+      res.json({ id, number, qrCode: url });
+    });
+  } catch (e) {
+    if (e.code === 'SQLITE_CONSTRAINT_UNIQUE') res.status(400).json({ error: 'Nomor meja sudah ada' });
+    else res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/tables/:tableId', auth.requireAdmin, (req, res) => {
+  try {
+    const s = require('./db').getStatements();
+    s.deleteTable.run(req.params.tableId);
+    io.emit('table-updated');
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+\napp.get('/api/tables', auth.requireAdmin, (req, res) => {
   const tableList = s.getAllTables.all();
   res.json(tableList);
 });
@@ -922,6 +956,57 @@ app.delete("/api/staff/:id", auth.requireAdmin, (req, res) => {
 
 
 // Settings API
+
+// Reports API
+app.get("/api/reports", auth.requireAdmin, (req, res) => {
+  try {
+    const { start, end } = req.query;
+    let query = "SELECT * FROM orders WHERE status = 'completed'";
+    let params = [];
+    if (start && end) {
+      query += " AND timestamp >= ? AND timestamp <= ?";
+      params.push(parseInt(start), parseInt(end));
+    }
+    
+    // We can access db through the getStatements if we export it, or just add a new exported function
+    // Wait, the db module exports an object. Let's just require it.
+    const dbModule = require('./db');
+    const stmt = dbModule.db ? dbModule.db.prepare(query) : null; 
+    
+    if (!stmt) {
+        // Fallback if db is not directly exposed
+        res.json({ error: "DB not exposed" });
+        return;
+    }
+
+    const rows = stmt.all(...params);
+    
+    let totalRevenue = 0;
+    const paymentMethods = { Tunai: 0, QRIS: 0, Debit: 0, Kredit: 0 };
+    const itemsCount = {};
+    
+    rows.forEach(r => {
+      totalRevenue += r.total;
+      const pm = r.payment_method || "Tunai";
+      if (paymentMethods[pm] !== undefined) paymentMethods[pm] += r.total;
+      else paymentMethods[pm] = r.total;
+      
+      try {
+        const items = JSON.parse(r.items);
+        items.forEach(i => {
+          if (!itemsCount[i.name]) itemsCount[i.name] = { qty: 0, revenue: 0 };
+          itemsCount[i.name].qty += i.quantity;
+          itemsCount[i.name].revenue += i.quantity * i.price;
+        });
+      } catch (e) {}
+    });
+    
+    res.json({ orders: rows, totalRevenue, paymentMethods, itemsCount });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch reports" });
+  }
+});
+
 app.get("/api/settings", (req, res) => {
   try {
     const settingsArr = s.getAllSettings.all();

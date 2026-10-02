@@ -37,6 +37,7 @@ function init() {
       status TEXT NOT NULL DEFAULT 'pending', -- pending, preparing, ready, completed
       timestamp INTEGER NOT NULL,
       total INTEGER NOT NULL,
+      payment_method TEXT DEFAULT 'Tunai',
       FOREIGN KEY (table_id) REFERENCES tables(id)
     );
 
@@ -74,6 +75,11 @@ function init() {
   }
 
   // Column migration for existing DB
+
+  try {
+    db.exec(`ALTER TABLE orders ADD COLUMN payment_method TEXT DEFAULT 'Tunai'`);
+  } catch (e) {
+  }
   try {
     db.exec(`ALTER TABLE menu ADD COLUMN available INTEGER DEFAULT 1`);
   } catch (e) {
@@ -156,7 +162,7 @@ function getStatements() {
       getAllTables: db.prepare('SELECT id, number, qr_code as qrCode FROM tables'),
       getTable: db.prepare('SELECT id, number, qr_code as qrCode FROM tables WHERE id = ?'),
       getTableAccessToken: db.prepare('SELECT access_token as accessToken FROM tables WHERE id = ?'),
-      updateTableQrCode: db.prepare('UPDATE tables SET qr_code = ? WHERE id = ?'),
+      updateTableQrCode: db.prepare('UPDATE tables SET qr_code = ? WHERE id = ?'),\n      createTable: db.prepare('INSERT INTO tables (id, number, access_token) VALUES (?, ?, ?)'),\n      deleteTable: db.prepare('DELETE FROM tables WHERE id = ?'),
 
       // Menu
       getAllMenu: db.prepare('SELECT id, name, price, category, image, description, available FROM menu WHERE is_deleted = 0'),
@@ -188,7 +194,7 @@ function getStatements() {
       getPendingOrders: db.prepare("SELECT * FROM orders WHERE status != 'completed' ORDER BY timestamp"),
       getOrderById: db.prepare('SELECT * FROM orders WHERE id = ?'),
       updateOrderStatus: db.prepare('UPDATE orders SET status = ? WHERE id = ?'),
-      markTableOrdersCompleted: db.prepare("UPDATE orders SET status = 'completed' WHERE table_id = ? AND status != 'completed'"),
+      markTableOrdersCompleted: db.prepare("UPDATE orders SET status = 'completed', payment_method = ? WHERE table_id = ? AND status != 'completed'"),
       getOrderHistory: db.prepare('SELECT * FROM orders ORDER BY timestamp DESC LIMIT ? OFFSET ?'),
       getOrderHistoryCount: db.prepare('SELECT COUNT(*) as count FROM orders'),
       // Users
@@ -229,6 +235,7 @@ function getAllPendingOrdersWithTable() {
 }
 
 module.exports = {
+  db: db,
   init,
   getTableWithOrders,
   getAllPendingOrdersWithTable,
