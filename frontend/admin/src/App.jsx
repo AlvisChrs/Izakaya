@@ -159,7 +159,7 @@ function OrderHistoryTab({ adminToken }) {
 }
 
 
-function SalesReportTab({ orders, menu }) {
+function SalesReportTab({ orders }) {
   // Process orders for charts
   const completedOrders = orders.filter(o => o.status === "completed");
   
@@ -575,11 +575,14 @@ function StaffTab({ adminToken }) {
 
 
 
+
 function SettingsTab({ adminToken }) {
   const [settings, setSettings] = useState({ restaurant_name: "", tax_rate: "", service_charge: "" });
   const [loading, setLoading] = useState(false);
+  const [tables, setTables] = useState([]);
+  const [newTableNumber, setNewTableNumber] = useState("");
 
-  useEffect(() => {
+  const fetchSettings = () => {
     fetch(`${API_URL}/api/settings`)
       .then(res => res.json())
       .then(data => setSettings({
@@ -588,9 +591,22 @@ function SettingsTab({ adminToken }) {
         service_charge: data.service_charge || ""
       }))
       .catch(console.error);
-  }, []);
+  };
 
-  const handleSave = async (e) => {
+  const fetchTables = () => {
+    fetch(`${API_URL}/api/tables`, { headers: { "Authorization": `Bearer ${adminToken}` } })
+      .then(res => res.json())
+      .then(data => setTables(data.sort((a, b) => a.number - b.number)))
+      .catch(console.error);
+  };
+
+  useEffect(() => {
+    fetchSettings();
+    fetchTables();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminToken]);
+
+  const handleSaveSettings = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
@@ -608,11 +624,42 @@ function SettingsTab({ adminToken }) {
     }
   };
 
+  const handleAddTable = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_URL}/api/tables`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${adminToken}` },
+        body: JSON.stringify({ number: newTableNumber })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal menambah meja");
+      setNewTableNumber("");
+      fetchTables();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleDeleteTable = async (id, num) => {
+    if (!confirm(`Hapus Meja ${num}?`)) return;
+    try {
+      const res = await fetch(`${API_URL}/api/tables/${id}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${adminToken}` }
+      });
+      if (!res.ok) throw new Error("Gagal menghapus meja");
+      fetchTables();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   return (
-    <main className="main" style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "20px" }}>
-      <div style={{ background: "var(--bg-card, #fff)", padding: "30px", borderRadius: "12px", border: "1px solid #e5e7eb", width: "100%", maxWidth: "600px" }}>
+    <main className="main" style={{ display: "flex", gap: "20px", alignItems: "flex-start", padding: "20px" }}>
+      <div style={{ flex: 1, background: "var(--bg-card, #fff)", padding: "30px", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
         <h2 style={{ marginBottom: "20px", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>⚙️ Pengaturan Restoran</h2>
-        <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+        <form onSubmit={handleSaveSettings} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
           <div>
             <label style={{ fontWeight: "bold", marginBottom: "5px", display: "block" }}>Nama Restoran</label>
             <input 
@@ -645,6 +692,44 @@ function SettingsTab({ adminToken }) {
           </button>
         </form>
       </div>
+      
+      <div style={{ flex: 1, background: "var(--bg-card, #fff)", padding: "30px", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
+        <h2 style={{ marginBottom: "20px", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>🪑 Manajemen Meja</h2>
+        <form onSubmit={handleAddTable} style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+          <input 
+            type="number" 
+            placeholder="Nomor Meja" 
+            value={newTableNumber} 
+            onChange={e => setNewTableNumber(e.target.value)} 
+            required 
+            style={{ flex: 1, padding: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
+          />
+          <button type="submit" style={{ padding: "10px 15px", background: "#3b82f6", color: "#fff", borderRadius: "6px", border: "none", cursor: "pointer", fontWeight: "bold" }}>
+            Tambah
+          </button>
+        </form>
+        
+        <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid #ccc", textAlign: "left" }}>
+                <th style={{ padding: "10px 0" }}>Meja</th>
+                <th style={{ padding: "10px 0", textAlign: "right" }}>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tables.map(t => (
+                <tr key={t.id} style={{ borderBottom: "1px solid #eee" }}>
+                  <td style={{ padding: "10px 0" }}>Meja {t.number}</td>
+                  <td style={{ padding: "10px 0", textAlign: "right" }}>
+                    <button onClick={() => handleDeleteTable(t.id, t.number)} style={{ background: "#ef4444", color: "#fff", padding: "5px 10px", borderRadius: "4px", border: "none", cursor: "pointer" }}>Hapus</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </main>
   );
 }
@@ -665,7 +750,7 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [adminToken, setAdminToken] = useState(() => localStorage.getItem(ADMIN_TOKEN_KEY));
-    const [adminRole, setAdminRole] = useState(() => localStorage.getItem('ADMIN_ROLE') || 'admin');
+    const [adminRole] = useState(() => localStorage.getItem('ADMIN_ROLE') || 'admin');
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [editingMenu, setEditingMenu] = useState(null);
   const [menuForm, setMenuForm] = useState({
@@ -678,6 +763,7 @@ function App() {
   const [imageFile, setImageFile] = useState(null);
   const [customCategory, setCustomCategory] = useState('');
   const [adminBillData, setAdminBillData] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState("Tunai");
 
   // Audio chime for waiter call
   const playChimeSound = () => {
@@ -822,7 +908,7 @@ function App() {
 
   const handleConfirmAdminPayment = (tableId) => {
     if (!socket || !adminToken) return;
-    socket.emit('admin-confirm-payment', tableId);
+    socket.emit('admin-confirm-payment', { tableId, method: paymentMethod });
   };
 
   const handlePrintReceipt = () => {
@@ -1066,7 +1152,7 @@ function App() {
       </div>
 
       {activeTab === 'history' && <OrderHistoryTab adminToken={adminToken} />}
-      {activeTab === 'reports' && <SalesReportTab orders={orders} menu={menu} />}
+      {activeTab === 'reports' && <SalesReportTab adminToken={adminToken} />}
       {activeTab === 'feedbacks' && <FeedbacksTab adminToken={adminToken} />}
       {activeTab === 'pos' && <POSTab adminToken={adminToken} menu={menu} categories={categories} />}
       {activeTab === 'staff' && <StaffTab adminToken={adminToken} />}
@@ -1408,9 +1494,7 @@ function App() {
                     <button className="print-btn" onClick={handlePrintReceipt}>
                       🖨️ Cetak Struk
                     </button>
-                    <button className="confirm-pay-btn" onClick={() => handleConfirmAdminPayment(adminBillData.tableId)}>
-                      ✅ Tandai Lunas
-                    </button>
+                    <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={{ padding: "10px", borderRadius: "6px", border: "1px solid #ccc", background: "#fff", cursor: "pointer", outline: "none" }}><option value="Tunai">💵 Tunai</option><option value="QRIS">📱 QRIS</option><option value="Debit">💳 Debit BCA</option><option value="Kredit">💳 Kartu Kredit</option></select><button className="confirm-pay-btn" onClick={() => handleConfirmAdminPayment(adminBillData.tableId)}>✅ Tandai Lunas</button>
                   </div>
                 </>
               )}
