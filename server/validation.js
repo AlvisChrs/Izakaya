@@ -2,7 +2,7 @@ const { z } = require('zod');
 const { v4: uuidv4 } = require('uuid');
 
 const schemas = {
-  tableId: z.string().regex(/^table-\d+$/),
+  tableId: z.string().min(1),
   orderId: z.string().uuid(),
   menuItem: z.object({
     menuId: z.string().startsWith('m'),
@@ -24,7 +24,7 @@ const schemas = {
     description: z.string().optional()
   }),
   waiterRequest: z.object({
-    tableId: z.string().regex(/^table-\d+$/),
+    tableId: z.string().min(1),
     requestType: z.string().trim().min(1).max(100)
   })
 };

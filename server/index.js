@@ -643,7 +643,7 @@ app.delete('/api/tables/:tableId', auth.requireAdmin, (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-\napp.get('/api/tables', auth.requireAdmin, (req, res) => {
+app.get('/api/tables', auth.requireAdmin, (req, res) => {
   const tableList = s.getAllTables.all();
   res.json(tableList);
 });
@@ -871,7 +871,7 @@ app.post("/api/pos/order", auth.requireAdmin, express.json(), (req, res) => {
     const order = { id: orderId, tableId, tableNumber: tableName, items: authoritativeItems, notes: notes || "POS Order", status, timestamp, total };
     
     // Notify kitchen
-    io.to("kitchen").emit("order-placed", order);
+    io.to("kitchen").emit("new-order", order);
     broadcastMenuUpdated();
     
     res.json({ message: "Pesanan berhasil dibuat", order });

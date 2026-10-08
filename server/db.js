@@ -162,7 +162,9 @@ function getStatements() {
       getAllTables: db.prepare('SELECT id, number, qr_code as qrCode FROM tables'),
       getTable: db.prepare('SELECT id, number, qr_code as qrCode FROM tables WHERE id = ?'),
       getTableAccessToken: db.prepare('SELECT access_token as accessToken FROM tables WHERE id = ?'),
-      updateTableQrCode: db.prepare('UPDATE tables SET qr_code = ? WHERE id = ?'),\n      createTable: db.prepare('INSERT INTO tables (id, number, access_token) VALUES (?, ?, ?)'),\n      deleteTable: db.prepare('DELETE FROM tables WHERE id = ?'),
+      updateTableQrCode: db.prepare('UPDATE tables SET qr_code = ? WHERE id = ?'),
+      createTable: db.prepare('INSERT INTO tables (id, number, access_token) VALUES (?, ?, ?)'),
+      deleteTable: db.prepare('DELETE FROM tables WHERE id = ?'),
 
       // Menu
       getAllMenu: db.prepare('SELECT id, name, price, category, image, description, available FROM menu WHERE is_deleted = 0'),
