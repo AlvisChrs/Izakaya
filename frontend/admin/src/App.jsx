@@ -225,7 +225,7 @@ function SalesReportTab({ adminToken }) {
             <option value="week">7 Hari Terakhir</option>
             <option value="month">30 Hari Terakhir</option>
           </select>
-          <button onClick={exportToCSV} style={{ padding: "8px 15px", background: "var(--accent-primary)", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}>📥 Export CSV</button>
+          <button onClick={exportToCSV} style={{ padding: "8px 15px", background: "var(--accent-primary)", color: 'var(--text-main)', border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}>📥 Export CSV</button>
         </div>
       </div>
 
@@ -236,7 +236,7 @@ function SalesReportTab({ adminToken }) {
         </div>
         <div style={{ flex: 1, background: "var(--bg-card)", color: "var(--text-main)", padding: "20px", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
           <h3 style={{ color: "var(--text-muted)", fontSize: "14px", marginBottom: "10px" }}>Total Pesanan</h3>
-          <p style={{ fontSize: "28px", fontWeight: "bold", margin: 0, color: "#3b82f6" }}>{reportData.orders.length}</p>
+          <p style={{ fontSize: "28px", fontWeight: "bold", margin: 0, color: 'var(--text-main)' }}>{reportData.orders.length}</p>
         </div>
       </div>
 
@@ -268,7 +268,7 @@ function SalesReportTab({ adminToken }) {
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {Object.entries(reportData.paymentMethods).map(([method, amount]) => (
               <li key={method} style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid var(--border-light)" }}>
-                <span style={{ fontWeight: "bold", color: "#475569" }}>{method}</span>
+                <span style={{ fontWeight: "bold", color: 'var(--text-main)' }}>{method}</span>
                 <span style={{ color: "var(--text-main)" }}>Rp {amount.toLocaleString("id-ID")}</span>
               </li>
             ))}
@@ -309,7 +309,7 @@ function FeedbacksTab({ adminToken }) {
               <div key={f.id} style={{ background: 'var(--bg-card)', padding: "20px", borderRadius: "12px", border: '1px solid var(--border-light)' }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
                   <strong>Meja {f.table_id.replace("table-", "")}</strong>
-                  <span style={{ color: "#888", fontSize: "0.9rem" }}>{new Date(f.created_at).toLocaleString("id-ID")}</span>
+                  <span style={{ color: 'var(--text-main)', fontSize: "0.9rem" }}>{new Date(f.created_at).toLocaleString("id-ID")}</span>
                 </div>
                 <div style={{ fontSize: "1.2rem", marginBottom: "10px" }}>{renderStars(f.rating)}</div>
                 <p style={{ color: "var(--text-color, #333)", fontStyle: f.comment ? "normal" : "italic" }}>
@@ -427,9 +427,9 @@ function POSTab({ adminToken, menu, categories }) {
             <div key={item.id} onClick={() => addToCart(item)} style={{ cursor: item.available === 0 ? "not-allowed" : "pointer", opacity: item.available === 0 ? 0.5 : 1, border: '1px solid var(--border-light)', borderRadius: "10px", padding: "10px", textAlign: "center", transition: "transform 0.2s" }} onMouseOver={e => { if(item.available !== 0) e.currentTarget.style.transform = "scale(1.05)" }} onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}>
               <div style={{ fontSize: "2rem", marginBottom: "10px" }}>{item.image && (item.image.startsWith("http") || item.image.startsWith("/uploads")) ? <img src={item.image} style={{ width: "100%", height: "80px", objectFit: "cover", borderRadius: "8px" }}/> : item.image}</div>
               <div style={{ fontWeight: "600", fontSize: "0.9rem", marginBottom: "5px" }}>{item.name}</div>
-              <div style={{ color: "#ef4444", fontSize: "0.85rem", fontWeight: "bold" }}>Rp {item.price.toLocaleString("id-ID")}</div>
+              <div style={{ color: 'var(--text-main)', fontSize: "0.85rem", fontWeight: "bold" }}>Rp {item.price.toLocaleString("id-ID")}</div>
               {item.available === 0 && <div style={{ color: "red", fontSize: "0.75rem", marginTop: "5px" }}>Habis</div>}
-              {item.available > 0 && <div style={{ color: "#888", fontSize: "0.75rem", marginTop: "5px" }}>Stok: {item.available}</div>}
+              {item.available > 0 && <div style={{ color: 'var(--text-main)', fontSize: "0.75rem", marginTop: "5px" }}>Stok: {item.available}</div>}
             </div>
           ))}
         </div>
@@ -440,7 +440,7 @@ function POSTab({ adminToken, menu, categories }) {
         <h3 style={{ marginBottom: "15px", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>🛒 Keranjang POS</h3>
         
         <div style={{ marginBottom: "15px" }}>
-          <label style={{ fontSize: "0.9rem", color: "#666", marginBottom: "5px", display: "block" }}>Nama / Meja Pemesan</label>
+          <label style={{ fontSize: "0.9rem", color: 'var(--text-main)', marginBottom: "5px", display: "block" }}>Nama / Meja Pemesan</label>
           <input 
             type="text" 
             value={tableName} 
@@ -451,13 +451,13 @@ function POSTab({ adminToken, menu, categories }) {
 
         <div style={{ flex: 1, overflowY: "auto", marginBottom: "15px" }}>
           {cart.length === 0 ? (
-            <p style={{ textAlign: "center", color: "#888", marginTop: "20px" }}>Keranjang kosong</p>
+            <p style={{ textAlign: "center", color: 'var(--text-main)', marginTop: "20px" }}>Keranjang kosong</p>
           ) : (
             cart.map((c) => (
               <div key={c.menuId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px dashed #eee" }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: "600", fontSize: "0.9rem" }}>{c.name}</div>
-                  <div style={{ color: "#888", fontSize: "0.8rem" }}>Rp {c.price.toLocaleString("id-ID")}</div>
+                  <div style={{ color: 'var(--text-main)', fontSize: "0.8rem" }}>Rp {c.price.toLocaleString("id-ID")}</div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <button onClick={() => updateQuantity(c.menuId, -1)} style={{ width: "25px", height: "25px", borderRadius: "50%", border: "1px solid #ccc", background: 'var(--bg-card)', color: 'var(--text-main)', cursor: "pointer" }}>-</button>
@@ -472,12 +472,12 @@ function POSTab({ adminToken, menu, categories }) {
         <div style={{ borderTop: "2px dashed #eee", paddingTop: "15px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "1.1rem", fontWeight: "bold", marginBottom: "15px" }}>
             <span>Total</span>
-            <span style={{ color: "#ef4444" }}>Rp {total.toLocaleString("id-ID")}</span>
+            <span style={{ color: 'var(--text-main)' }}>Rp {total.toLocaleString("id-ID")}</span>
           </div>
           <button 
             onClick={submitOrder}
             disabled={isSubmitting || cart.length === 0}
-            style={{ width: "100%", padding: "15px", background: (isSubmitting || cart.length === 0) ? "#ccc" : "#10b981", color: "#fff", border: "none", borderRadius: "8px", fontSize: "1rem", fontWeight: "bold", cursor: (isSubmitting || cart.length === 0) ? "not-allowed" : "pointer" }}
+            style={{ width: "100%", padding: "15px", background: (isSubmitting || cart.length === 0) ? "#ccc" : "#10b981", color: 'var(--text-main)', border: "none", borderRadius: "8px", fontSize: "1rem", fontWeight: "bold", cursor: (isSubmitting || cart.length === 0) ? "not-allowed" : "pointer" }}
           >
             {isSubmitting ? "Memproses..." : "Buat Pesanan"}
           </button>
@@ -561,7 +561,7 @@ function StaffTab({ adminToken }) {
               <option value="admin">Superadmin</option>
             </select>
           </div>
-          <button type="submit" disabled={loading} style={{ background: "#3b82f6", color: "#fff", padding: "10px", borderRadius: "6px", border: "none", cursor: "pointer", marginTop: "10px" }}>
+          <button type="submit" disabled={loading} style={{ background: "#3b82f6", color: 'var(--text-main)', padding: "10px", borderRadius: "6px", border: "none", cursor: "pointer", marginTop: "10px" }}>
             {loading ? "Menambahkan..." : "Tambah Staf"}
           </button>
         </form>
@@ -583,7 +583,7 @@ function StaffTab({ adminToken }) {
                 <td style={{ padding: "10px", borderBottom: "1px solid #eee" }}>{s.username}</td>
                 <td style={{ padding: "10px", borderBottom: "1px solid #eee", textTransform: "capitalize" }}>{s.role}</td>
                 <td style={{ padding: "10px", borderBottom: "1px solid #eee" }}>
-                  <button onClick={() => handleDelete(s.id, s.username)} style={{ background: "#ef4444", color: "#fff", border: "none", padding: "5px 10px", borderRadius: "4px", cursor: "pointer" }}>Hapus</button>
+                  <button onClick={() => handleDelete(s.id, s.username)} style={{ background: "#ef4444", color: 'var(--text-main)', border: "none", padding: "5px 10px", borderRadius: "4px", cursor: "pointer" }}>Hapus</button>
                 </td>
               </tr>
             ))}
@@ -708,7 +708,7 @@ function SettingsTab({ adminToken }) {
               style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
             />
           </div>
-          <button type="submit" disabled={loading} style={{ background: "#10b981", color: "#fff", padding: "12px", borderRadius: "6px", border: "none", cursor: "pointer", marginTop: "10px", fontWeight: "bold", fontSize: "1.1rem" }}>
+          <button type="submit" disabled={loading} style={{ background: "#10b981", color: 'var(--text-main)', padding: "12px", borderRadius: "6px", border: "none", cursor: "pointer", marginTop: "10px", fontWeight: "bold", fontSize: "1.1rem" }}>
             {loading ? "Menyimpan..." : "💾 Simpan Pengaturan"}
           </button>
         </form>
@@ -725,7 +725,7 @@ function SettingsTab({ adminToken }) {
             required 
             style={{ flex: 1, padding: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
           />
-          <button type="submit" style={{ padding: "10px 15px", background: "#3b82f6", color: "#fff", borderRadius: "6px", border: "none", cursor: "pointer", fontWeight: "bold" }}>
+          <button type="submit" style={{ padding: "10px 15px", background: "#3b82f6", color: 'var(--text-main)', borderRadius: "6px", border: "none", cursor: "pointer", fontWeight: "bold" }}>
             Tambah
           </button>
         </form>
@@ -743,7 +743,7 @@ function SettingsTab({ adminToken }) {
                 <tr key={t.id} style={{ borderBottom: "1px solid #eee" }}>
                   <td style={{ padding: "10px 0" }}>Meja {t.number}</td>
                   <td style={{ padding: "10px 0", textAlign: "right" }}>
-                    <button onClick={() => handleDeleteTable(t.id, t.number)} style={{ background: "#ef4444", color: "#fff", padding: "5px 10px", borderRadius: "4px", border: "none", cursor: "pointer" }}>Hapus</button>
+                    <button onClick={() => handleDeleteTable(t.id, t.number)} style={{ background: "#ef4444", color: 'var(--text-main)', padding: "5px 10px", borderRadius: "4px", border: "none", cursor: "pointer" }}>Hapus</button>
                   </td>
                 </tr>
               ))}
@@ -1265,7 +1265,7 @@ function App() {
                             bill: { tableNumber: table.number, items: pending, timestamp: Date.now() }
                           });
                           setTimeout(() => window.print(), 200);
-                        }} style={{ width: '100%', marginTop: '5px', padding: '8px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                        }} style={{ width: '100%', marginTop: '5px', padding: '8px', background: '#f59e0b', color: 'var(--text-main)', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
                           👨‍🍳 Cetak Pesanan Dapur
                         </button>
                       )}

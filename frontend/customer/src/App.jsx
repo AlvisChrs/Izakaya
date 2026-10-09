@@ -436,7 +436,7 @@ function App() {
       </main>
 
       {cart.length > 0 && !isCartOpen && (
-        <button onClick={() => setIsCartOpen(true)} style={{ position: "fixed", bottom: "20px", right: "20px", background: "#ef4444", color: "#fff", padding: "15px 20px", borderRadius: "50px", border: "none", boxShadow: "0 4px 12px rgba(239,68,68,0.4)", cursor: "pointer", zIndex: 100, display: "flex", alignItems: "center", gap: "10px", fontWeight: "bold", fontSize: "16px" }}>
+        <button onClick={() => setIsCartOpen(true)} style={{ position: "fixed", bottom: "20px", right: "20px", background: "#ef4444", color: 'var(--text-main)', padding: "15px 20px", borderRadius: "50px", border: "none", boxShadow: "0 4px 12px rgba(239,68,68,0.4)", cursor: "pointer", zIndex: 100, display: "flex", alignItems: "center", gap: "10px", fontWeight: "bold", fontSize: "16px" }}>
           🛒 <span>{cart.reduce((sum, item) => sum + item.quantity, 0)} Item</span>
           <span>- Rp {cart.reduce((sum, item) => sum + (item.price * item.quantity), 0).toLocaleString("id-ID")}</span>
         </button>
