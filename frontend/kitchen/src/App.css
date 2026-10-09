@@ -505,7 +505,7 @@ body {
 }
 
 /* Base Card Styling for ALL cards including inline styled ones */
-.main > div, .tab-content > div, .table-card, .stat-card, .order-card, .waiter-call-card, .menu-item-admin, .category-card {
+.table-card, .stat-card, .order-card, .waiter-call-card, .menu-item-admin, .category-card {
   background: var(--bg-card) !important;
   border: 1px solid var(--border-light) !important;
   border-radius: 16px !important;
