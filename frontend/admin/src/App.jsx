@@ -1069,7 +1069,7 @@ function App() {
   };
 
   if (!adminToken) {
-    return <LoginPage onLogin={setAdminToken} />;
+    return <LoginPage onLogin={(data) => { setAdminToken(data.token); }} />;
   }
 
   if (loading) {
