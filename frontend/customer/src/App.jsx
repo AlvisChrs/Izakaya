@@ -32,6 +32,7 @@ function App() {
   const [isLightMode, setIsLightMode] = useState(() => localStorage.getItem('customerTheme') === 'light')
 
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
+  const [isCartOpen, setIsCartOpen] = useState(false)
   const [feedbackRating, setFeedbackRating] = useState(5)
   const [feedbackComment, setFeedbackComment] = useState('')
 
@@ -193,258 +194,264 @@ function App() {
   if (!tableId) return <div className="loading">Memuat...</div>
 
   return (
-    <div className="app">
-      <header className="header">
-        <h1>🏮 Izakaya</h1>
-        <div className="header-actions">
-          <button 
-            className="theme-toggle-btn" 
-            onClick={() => setIsLightMode(!isLightMode)}
-          >
-            {isLightMode ? '🌙' : '☀️'}
-          </button>
-          <button className="call-waiter-header-btn" onClick={() => setShowWaiterModal(true)}>
-            🛎️ <span>Panggil Pelayan</span>
-          </button>
-          <div className="table-info">
-            <span>Meja {table?.number || tableId}</span>
-            <span className={connected ? 'connected' : 'disconnected'}>
-              {connected ? '🟢 Terhubung' : '🔴 Terputus'}
-            </span>
+    <div className="mobile-app-wrapper">
+      <div className="mobile-container">
+        {/* Header */}
+        <header className="customer-header">
+          <h1>🏮 Izakaya</h1>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button 
+              className="theme-toggle-btn" 
+              onClick={() => setIsLightMode(!isLightMode)}
+              style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer' }}
+            >
+              {isLightMode ? '🌙' : '☀️'}
+            </button>
+            <span className="table-badge">Meja {table?.number || tableId.replace('table-', '')}</span>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Active Waiter Call Banner */}
-      {activeWaiterRequest && (
-        <div className="waiter-active-banner">
-          <div className="waiter-banner-content">
-            <span className="waiter-pulse">🔔</span>
-            <span>Pelayan sedang menuju meja Anda (Minta: <strong>{activeWaiterRequest.requestType}</strong>)</span>
+        {/* Active Waiter Call Banner */}
+        {activeWaiterRequest && (
+          <div className="waiter-active-banner" style={{ background: 'var(--accent-secondary)', color: '#000', padding: '10px 24px', fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <span>🔔 Pelayan menuju meja Anda</span>
+            </div>
+            <button onClick={handleCancelWaiterCall} style={{ background: 'rgba(0,0,0,0.1)', border: 'none', padding: '4px 12px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+              Batal
+            </button>
           </div>
-          <button className="cancel-waiter-btn" onClick={handleCancelWaiterCall}>
-            Batal
-          </button>
-        </div>
-      )}
+        )}
 
-      <main className="main">
-        {/* Menu Sidebar */}
-        <aside className="menu-sidebar">
-          <nav className="categories">
-            {categories.map(cat => (
-              <button
-                key={cat}
-                className={activeCategory === cat ? 'active' : ''}
-                onClick={() => setActiveCategory(cat)}
-              >
-                {cat}
-              </button>
-            ))}
-          </nav>
+        {/* Categories Bar */}
+        <nav className="categories-scroll">
+          {categories.map(cat => (
+            <button
+              key={cat}
+              className={`cat-btn ${activeCategory === cat ? 'active' : ''}`}
+              onClick={() => setActiveCategory(cat)}
+            >
+              {cat}
+            </button>
+          ))}
+        </nav>
 
-          <div className="menu-items">
-            {filteredMenu.map(item => (
-              <div key={item.id} className={`menu-item ${item.available === 0 ? 'out-of-stock' : ''}`}>
-                <div className="item-info">
-                  {item.image && (item.image.startsWith('http') || item.image.startsWith('/uploads')) ? (
-                    <img src={item.image} alt={item.name} className="item-image-preview" />
-                  ) : (
-                    <span className="item-emoji">{item.image}</span>
-                  )}
-                  <div>
-                    <h4>
-                      {item.name}
-                      {item.available === 0 && <span className="sold-out-tag">HABIS</span>}
-                    </h4>
-                    <p className="item-desc">{item.description}</p>
-                    <p className="item-price">Rp {item.price.toLocaleString('id-ID')}</p>
-                  </div>
-                </div>
-                <button
-                  className="add-btn"
-                  onClick={() => addToCart(item)}
-                  disabled={item.available === 0}
-                  title={item.available === 0 ? 'Stok Habis' : 'Tambah ke Keranjang'}
-                >
-                  {item.available === 0 ? '✕' : '+'}
-                </button>
+        {/* Menu Container */}
+        <main className="menu-container">
+          {filteredMenu.map(item => (
+            <div key={item.id} className="menu-card">
+              <div className="menu-img">
+                {item.image && (item.image.startsWith('http') || item.image.startsWith('/uploads')) ? (
+                  <img src={item.image} alt={item.name} style={{width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit'}} />
+                ) : (
+                  item.image
+                )}
               </div>
-            ))}
-          </div>
-        </aside>
-
-        {/* Cart & Orders */}
-        <div className="content">
-          {/* Cart */}
-          <section className="cart-section">
-            <h2>Keranjang {cart.length > 0 && `(${cart.reduce((s, i) => s + i.quantity, 0)})`}</h2>
-            {cart.length === 0 ? (
-              <p className="empty-cart">Keranjang kosong</p>
-            ) : (
-              <>
-                <div className="cart-items">
-                  {cart.map(item => (
-                    <div key={item.menuId} className="cart-item">
-                      <div className="cart-item-info">
-                        <h4>{item.name}</h4>
-                        <p>Rp {item.price.toLocaleString('id-ID')} x {item.quantity}</p>
-                      </div>
-                      <div className="qty-controls">
-                        <button onClick={() => updateQuantity(item.menuId, -1)}>-</button>
-                        <span>{item.quantity}</span>
-                        <button onClick={() => updateQuantity(item.menuId, 1)}>+</button>
-                      </div>
-                    </div>
-                  ))}
+              <div className="menu-details">
+                <div>
+                  <h4>
+                    {item.name}
+                    {item.available === 0 && <span style={{fontSize: '0.7rem', background: 'var(--accent-primary)', color: '#fff', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px', verticalAlign: 'middle'}}>HABIS</span>}
+                  </h4>
+                  <p className="menu-desc">{item.description}</p>
                 </div>
-                <div className="cart-notes">
-                  <textarea
-                    placeholder="Catatan untuk dapur (opsional)..."
-                    value={notes}
-                    onChange={e => setNotes(e.target.value)}
-                    rows={2}
-                  />
-                </div>
-                <div className="cart-total">
-                  <span>Total: Rp {cartTotal.toLocaleString('id-ID')}</span>
-                  <button className="order-btn" onClick={placeOrder} disabled={cart.length === 0}>
-                    Pesan
+                <div className="menu-bottom">
+                  <span className="menu-price">Rp {item.price.toLocaleString('id-ID')}</span>
+                  <button
+                    className={`add-btn ${item.available === 0 ? 'disabled' : ''}`}
+                    onClick={() => addToCart(item)}
+                    disabled={item.available === 0}
+                  >
+                    {item.available === 0 ? '✕' : '+'}
                   </button>
                 </div>
-              </>
-            )}
-          </section>
+              </div>
+            </div>
+          ))}
+        </main>
 
-          {/* Orders */}
-          <section className="orders-section">
-            <h2>Pesanan Saya</h2>
-            {orders.length === 0 ? (
-              <p className="empty-orders">Belum ada pesanan</p>
-            ) : (
-              <div className="orders-list">
-                {orders.map(order => (
-                  <div key={order.id} className="order-card">
-                    <div className="order-header">
-                      <span>Order #{order.id.slice(0, 8)}</span>
-                      <span
-                        className="status-badge"
-                        style={{ backgroundColor: getStatusColor(order.status) }}
-                      >
-                        {getStatusLabel(order.status)}
-                      </span>
+        {/* Call Waiter Floating Button */}
+        <button 
+          className="floating-waiter-btn" 
+          onClick={() => setShowWaiterModal(true)}
+          title="Panggil Pelayan"
+        >
+          🛎️
+        </button>
+
+        {/* Floating Cart Wrapper */}
+        {cart.length > 0 && !isCartOpen && (
+          <div className="floating-cart-wrapper">
+            <div className="floating-cart-bar" onClick={() => setIsCartOpen(true)}>
+              <div className="cart-qty">
+                🛒 {cart.reduce((sum, item) => sum + item.quantity, 0)} Item
+              </div>
+              <div className="cart-checkout-text">
+                Rp {cart.reduce((sum, item) => sum + (item.price * item.quantity), 0).toLocaleString("id-ID")}
+                <span>→</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cart Modal (Slide Up) */}
+        {isCartOpen && (
+          <div className="modal-overlay" onClick={() => setIsCartOpen(false)} style={{ zIndex: 200, alignItems: 'flex-end', padding: 0 }}>
+            <div className="modal cart-modal" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', borderRadius: '32px 32px 0 0', maxHeight: '80vh', overflowY: 'auto', padding: '32px 24px', border: 'none' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <h2 style={{ margin: 0 }}>Keranjang</h2>
+                <button onClick={() => setIsCartOpen(false)} style={{ background: 'var(--bg-input)', border: 'none', width: '36px', height: '36px', borderRadius: '50%', color: 'var(--text-main)', cursor: 'pointer' }}>✕</button>
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+                {cart.map(item => (
+                  <div key={item.menuId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 4px 0' }}>{item.name}</h4>
+                      <div style={{ color: 'var(--accent-primary)', fontWeight: 'bold' }}>Rp {item.price.toLocaleString('id-ID')}</div>
                     </div>
-                    <div className="order-items">
-                      {order.items.map((item, i) => (
-                        <div key={i} className="order-item">
-                          <span>{item.name} x{item.quantity}</span>
-                          <span>Rp {(item.price * item.quantity).toLocaleString('id-ID')}</span>
-                        </div>
-                      ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--bg-input)', padding: '4px', borderRadius: '30px' }}>
+                      <button onClick={() => updateQuantity(item.menuId, -1)} style={{ width: '28px', height: '28px', borderRadius: '50%', border: 'none', background: 'var(--bg-card)', color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>-</button>
+                      <span style={{ fontWeight: '600', width: '20px', textAlign: 'center' }}>{item.quantity}</span>
+                      <button onClick={() => updateQuantity(item.menuId, 1)} style={{ width: '28px', height: '28px', borderRadius: '50%', border: 'none', background: 'var(--bg-card)', color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>+</button>
                     </div>
-                    <div className="order-total">
-                      Total: Rp {order.total.toLocaleString('id-ID')}
-                    </div>
-                    {order.notes && <p className="order-notes">Catatan: {order.notes}</p>}
                   </div>
                 ))}
               </div>
-            )}
 
-            {/* Bill Modal */}
-            {showBill && bill && (
-              <div className="bill-modal-overlay" onClick={() => {
-                setShowBill(false);
-                setPaymentMethod(null);
-                setCashRequested(false);
-              }}>
-                <div className="bill-modal" onClick={e => e.stopPropagation()}>
-                  <div className="bill-modal-header">
-                    <h2>🧾 Bill - Meja {bill.tableNumber}</h2>
-                    <button className="close-btn" onClick={() => {
-                      setShowBill(false);
-                      setPaymentMethod(null);
-                      setCashRequested(false);
-                    }}>✕</button>
+              <textarea
+                placeholder="Catatan untuk dapur (opsional)..."
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                rows={2}
+                style={{ width: '100%', marginBottom: '24px', resize: 'none' }}
+              />
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', fontSize: '1.2rem', fontWeight: 'bold' }}>
+                <span>Total:</span>
+                <span style={{ color: 'var(--accent-primary)' }}>Rp {cartTotal.toLocaleString('id-ID')}</span>
+              </div>
+
+              <button 
+                onClick={() => { placeOrder(); setIsCartOpen(false); }} 
+                style={{ width: '100%', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-hover))', color: '#fff', border: 'none', padding: '16px', borderRadius: '16px', fontSize: '1.1rem', fontWeight: 'bold', boxShadow: 'var(--shadow-glow)', cursor: 'pointer' }}
+              >
+                Pesan Sekarang
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Orders Section */}
+        {orders.length > 0 && (
+          <div style={{ padding: "0 24px 120px 24px" }}>
+            <h2 style={{ marginBottom: "16px" }}>Pesanan Anda</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {orders.map(order => (
+                <div key={order.id} className="menu-card" style={{ flexDirection: "column", gap: "12px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border)", paddingBottom: "12px" }}>
+                    <span style={{ fontWeight: "bold" }}>Order #{order.id.slice(0, 8)}</span>
+                    <span style={{ background: getStatusColor(order.status), color: "#fff", padding: "4px 10px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: "bold" }}>{getStatusLabel(order.status)}</span>
                   </div>
-                  
-                  <div className="bill-items">
-                    {bill.items.map((item, i) => (
-                      <div key={i} className="bill-item">
+                  <div>
+                    {order.items.map((item, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", margin: "4px 0" }}>
                         <span>{item.name} x{item.quantity}</span>
-                        <span>Rp {(item.price * item.quantity).toLocaleString('id-ID')}</span>
+                        <span>Rp {(item.price * item.quantity).toLocaleString("id-ID")}</span>
                       </div>
                     ))}
                   </div>
-                  <div className="bill-summary">
-                    <div><span>Subtotal</span><span>Rp {bill.subtotal.toLocaleString('id-ID')}</span></div>
-                    {bill.service_charge > 0 && <div><span>Service {bill.service_rate_str}%</span><span>Rp {bill.service_charge.toLocaleString("id-ID")}</span></div>}
-                      <div><span>PPN {bill.tax_rate_str}%</span><span>Rp {bill.tax.toLocaleString("id-ID")}</span></div>
-                    <div className="bill-total"><span>Total</span><span>Rp {bill.total.toLocaleString('id-ID')}</span></div>
-                  </div>
-                  
-                  <div className="payment-section">
-                    {!paymentMethod ? (
-                      <div className="payment-methods">
-                        <h3>Pilih Metode Pembayaran</h3>
-                        <div className="payment-options-grid">
-                          <button className="qris-btn" onClick={() => setPaymentMethod('qris')}>
-                            📱 Bayar pakai QRIS
-                          </button>
-                          <button className="cash-btn" onClick={() => payBill('cash')}>
-                            💵 Bayar Tunai (Panggil Kasir)
-                          </button>
-                        </div>
-                      </div>
-                    ) : paymentMethod === 'qris' ? (
-                      <div className="qris-simulation">
-                        <h3>Scan QRIS berikut</h3>
-                        <div className="qris-placeholder">
-                          {/* Fake QRIS representation */}
-                          <div className="qris-box">
-                            <span className="qris-logo">QRIS</span>
-                            <div className="qr-fake-pattern"></div>
-                          </div>
-                        </div>
-                        <p>Total: <strong>Rp {bill.total.toLocaleString('id-ID')}</strong></p>
-                        <button className="simulasi-btn" onClick={() => payBill('qris')}>
-                          Simulasikan Pembayaran Berhasil
-                        </button>
-                        <button className="kembali-btn" onClick={() => setPaymentMethod(null)}>Batal / Kembali</button>
-                      </div>
-                    ) : (
-                      <div className="cash-simulation">
-                        <h3>Bayar Tunai</h3>
-                        <div className="waiter-pulse" style={{ fontSize: '3rem', textAlign: 'center', margin: '20px 0' }}>💵</div>
-                        {cashRequested ? (
-                          <p><strong>Kasir sedang menuju ke meja Anda.</strong><br/>Silakan siapkan uang tunai sebesar <strong>Rp {bill.total.toLocaleString('id-ID')}</strong>.</p>
-                        ) : (
-                          <p>Memanggil kasir...</p>
-                        )}
-                      </div>
-                    )}
+                  <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", paddingTop: "8px", borderTop: "1px dashed var(--border)" }}>
+                    <span>Total</span>
+                    <span style={{ color: "var(--accent-primary)" }}>Rp {order.total.toLocaleString("id-ID")}</span>
                   </div>
                 </div>
+              ))}
+            </div>
+            {orders.some(o => o.status !== "completed") && (
+              <button onClick={requestBill} style={{ width: "100%", marginTop: "24px", background: "var(--bg-input)", color: "var(--text-main)", border: "1px solid var(--border)", padding: "16px", borderRadius: "16px", fontWeight: "bold", cursor: 'pointer' }}>Minta Bill (Bayar)</button>
+            )}
+          </div>
+        )}
+
+        {/* Bill Modal */}
+        {showBill && bill && (
+          <div className="modal-overlay" onClick={() => { setShowBill(false); setPaymentMethod(null); setCashRequested(false); }} style={{ zIndex: 200 }}>
+            <div className="modal bill-modal" onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h2 style={{ margin: 0 }}>🧾 Bill - Meja {bill.tableNumber}</h2>
+                <button onClick={() => { setShowBill(false); setPaymentMethod(null); setCashRequested(false); }} style={{ background: 'var(--bg-input)', border: 'none', width: '36px', height: '36px', borderRadius: '50%', color: 'var(--text-main)', cursor: 'pointer' }}>✕</button>
               </div>
-            )}
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
+                {bill.items.map((item, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{item.name} x{item.quantity}</span>
+                    <span>Rp {(item.price * item.quantity).toLocaleString('id-ID')}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}><span>Subtotal</span><span>Rp {bill.subtotal.toLocaleString('id-ID')}</span></div>
+                {bill.service_charge > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}><span>Service {bill.service_rate_str}%</span><span>Rp {bill.service_charge.toLocaleString("id-ID")}</span></div>}
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}><span>PPN {bill.tax_rate_str}%</span><span>Rp {bill.tax.toLocaleString("id-ID")}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.2rem', marginTop: '8px' }}><span>Total</span><span style={{ color: 'var(--accent-primary)' }}>Rp {bill.total.toLocaleString('id-ID')}</span></div>
+              </div>
+              
+              <div style={{ background: 'var(--bg-input)', padding: '16px', borderRadius: '16px' }}>
+                {!paymentMethod ? (
+                  <div>
+                    <h3 style={{ marginBottom: '16px', fontSize: '1.1rem' }}>Pilih Metode Pembayaran</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <button onClick={() => setPaymentMethod('qris')} style={{ background: '#0056b3', color: '#fff', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>📱 Bayar pakai QRIS</button>
+                      <button onClick={() => payBill('cash')} style={{ background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border)', padding: '12px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>💵 Bayar Tunai (Panggil Kasir)</button>
+                    </div>
+                  </div>
+                ) : paymentMethod === 'qris' ? (
+                  <div style={{ textAlign: 'center' }}>
+                    <h3 style={{ marginBottom: '16px' }}>Scan QRIS berikut</h3>
+                    <div style={{ width: '200px', height: '200px', background: '#fff', margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '12px', border: '2px solid #ccc' }}>
+                      <strong style={{ color: '#333' }}>[ QRIS CODE ]</strong>
+                    </div>
+                    <p style={{ marginBottom: '16px' }}>Total: <strong>Rp {bill.total.toLocaleString('id-ID')}</strong></p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <button onClick={() => payBill('qris')} style={{ background: 'var(--accent-primary)', color: '#fff', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>Simulasikan Pembayaran Berhasil</button>
+                      <button onClick={() => setPaymentMethod(null)} style={{ background: 'transparent', color: 'var(--text-muted)', border: 'none', padding: '8px', cursor: 'pointer' }}>Batal / Kembali</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center' }}>
+                    <h3 style={{ marginBottom: '16px' }}>Bayar Tunai</h3>
+                    <div style={{ fontSize: '3rem', margin: '20px 0' }}>💵</div>
+                    {cashRequested ? (
+                      <p><strong>Kasir sedang menuju ke meja Anda.</strong><br/>Silakan siapkan uang tunai sebesar <strong>Rp {bill.total.toLocaleString('id-ID')}</strong>.</p>
+                    ) : (
+                      <p>Memanggil kasir...</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
-            {!showBill && orders.some(o => o.status !== 'completed') && (
-              <button className="bill-btn" onClick={requestBill}>Minta Bill</button>
-            )}
-          </section>
-        </div>
-      </main>
+        {/* Waiter Modal */}
+        {showWaiterModal && (
+          <div className="modal-overlay" onClick={() => setShowWaiterModal(false)} style={{ zIndex: 200 }}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+              <h2 style={{ marginBottom: '16px' }}>Panggil Pelayan</h2>
+              <p style={{ marginBottom: '24px', color: 'var(--text-muted)' }}>Ada yang bisa kami bantu?</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <button onClick={() => handleCallWaiter('Minta Menu')} style={{ background: 'var(--bg-input)', color: 'var(--text-main)', border: '1px solid var(--border)', padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>📖 Minta Menu / Rekomendasi</button>
+                <button onClick={() => handleCallWaiter('Bersihkan Meja')} style={{ background: 'var(--bg-input)', color: 'var(--text-main)', border: '1px solid var(--border)', padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>🧹 Bersihkan Meja</button>
+                <button onClick={() => handleCallWaiter('Lainnya')} style={{ background: 'var(--bg-input)', color: 'var(--text-main)', border: '1px solid var(--border)', padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>💬 Bantuan Lainnya</button>
+              </div>
+              <button onClick={() => setShowWaiterModal(false)} style={{ width: '100%', marginTop: '24px', background: 'transparent', color: 'var(--text-muted)', border: 'none', padding: '12px', cursor: 'pointer', fontWeight: 'bold' }}>Batal</button>
+            </div>
+          </div>
+        )}
 
-      {cart.length > 0 && !isCartOpen && (
-        <button onClick={() => setIsCartOpen(true)} style={{ position: "fixed", bottom: "20px", right: "20px", background: "#ef4444", color: 'var(--text-main)', padding: "15px 20px", borderRadius: "50px", border: "none", boxShadow: "0 4px 12px rgba(239,68,68,0.4)", cursor: "pointer", zIndex: 100, display: "flex", alignItems: "center", gap: "10px", fontWeight: "bold", fontSize: "16px" }}>
-          🛒 <span>{cart.reduce((sum, item) => sum + item.quantity, 0)} Item</span>
-          <span>- Rp {cart.reduce((sum, item) => sum + (item.price * item.quantity), 0).toLocaleString("id-ID")}</span>
-        </button>
-      )}
-  
-
-      
-      {/* Feedback Modal */}
+        {/* Feedback Modal */}
       {showFeedbackModal && (
         <div className="bill-modal-overlay" onClick={() => setShowFeedbackModal(false)}>
           <div className="bill-modal" onClick={e => e.stopPropagation()} style={{ textAlign: "center" }}>
@@ -523,6 +530,7 @@ function App() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }
