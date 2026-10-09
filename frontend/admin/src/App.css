@@ -4,12 +4,63 @@
   padding: 0;
 }
 
+:root {
+  --bg-main: #0f172a;
+  --bg-card: rgba(30, 41, 59, 0.7);
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --accent: #ef4444;
+  --border: rgba(255, 255, 255, 0.1);
+}
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-  background: #f8f5f0;
-  color: #2d2d2d;
+  font-family: "Inter", -apple-system, sans-serif;
+  background: var(--bg-main);
+  background-image: radial-gradient(circle at 50% 0%, #1e293b 0%, #0f172a 70%);
+  color: var(--text-main);
   min-height: 100vh;
 }
+
+/* Override inline styles for cards */
+.main > div, .tab-content > div {
+  background: var(--bg-card) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-main) !important;
+  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5) !important;
+}
+
+input, select, textarea {
+  background: rgba(0,0,0,0.2) !important;
+  border: 1px solid var(--border) !important;
+  color: #fff !important;
+}
+
+.admin-header {
+  background: rgba(15, 23, 42, 0.8) !important;
+  backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.nav-btn {
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  transition: 0.3s;
+}
+.nav-btn.active {
+  background: rgba(239, 68, 68, 0.2) !important;
+  color: #ef4444 !important;
+  border-color: rgba(239, 68, 68, 0.5) !important;
+}
+
+th, td {
+  border-bottom: 1px solid var(--border) !important;
+  color: var(--text-main) !important;
+}
+th {
+  background: rgba(0,0,0,0.3) !important;
+}
+
 
 .loading {
   display: flex;
