@@ -159,98 +159,119 @@ function OrderHistoryTab({ adminToken }) {
 }
 
 
-function SalesReportTab({ orders }) {
-  // Process orders for charts
-  const completedOrders = orders.filter(o => o.status === "completed");
-  
-  // 1. Revenue over time (Mocking days based on timestamp, but right now all might be same day)
-  // We will just group by Date string
-  const revenueByDate = {};
-  completedOrders.forEach(o => {
-    const date = new Date(o.timestamp).toLocaleDateString("id-ID");
-    revenueByDate[date] = (revenueByDate[date] || 0) + o.total;
-  });
-  
-  const chartData = Object.keys(revenueByDate).map(date => ({
-    date,
-    revenue: revenueByDate[date]
-  }));
 
-  // 2. Top Selling Items
-  const itemCounts = {};
-  completedOrders.forEach(o => {
-    o.items.forEach(item => {
-      itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
-    });
-  });
+function SalesReportTab({ adminToken }) {
+  const [reportData, setReportData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [dateRange, setDateRange] = useState("all");
 
-  const topItems = Object.keys(itemCounts)
-    .map(name => ({ name, sold: itemCounts[name] }))
-    .sort((a, b) => b.sold - a.sold)
-    .slice(0, 5); // Top 5
+  const fetchReport = async () => {
+    setLoading(true);
+    try {
+      let url = `${API_URL}/api/reports`;
+      if (dateRange !== "all") {
+        const now = new Date();
+        let start = now;
+        if (dateRange === "today") {
+          start = new Date(now.setHours(0,0,0,0));
+        } else if (dateRange === "week") {
+          start = new Date(now.setDate(now.getDate() - 7));
+        } else if (dateRange === "month") {
+          start = new Date(now.setMonth(now.getMonth() - 1));
+        }
+        url += `?start=${start.getTime()}&end=${Date.now()}`;
+      }
+      
+      const res = await fetch(url, { headers: { "Authorization": `Bearer ${adminToken}` } });
+      const data = await res.json();
+      setReportData(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const handleExport = () => {
-    // Generate simple CSV
-    let csvContent = "data:text/csv;charset=utf-8,Tanggal,Total Pendapatan\n";
-    chartData.forEach(row => {
-      csvContent += `${row.date},${row.revenue}\n`;
-    });
-    
-    csvContent += "\nMenu Terlaris,Jumlah Terjual\n";
-    topItems.forEach(row => {
-      csvContent += `${row.name},${row.sold}\n`;
-    });
+  useEffect(() => {
+    fetchReport();
+  }, [dateRange]);
 
+  const exportToCSV = () => {
+    if (!reportData) return;
+    const headers = ["ID Pesanan,Tanggal,Metode Pembayaran,Total"];
+    const rows = reportData.orders.map(o => `${o.id},${new Date(o.timestamp).toLocaleString("id-ID")},${o.payment_method || "Tunai"},${o.total}`);
+    const csvContent = "data:text/csv;charset=utf-8," + headers.concat(rows).join("\\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "laporan_penjualan_izakaya.csv");
+    link.setAttribute("download", `laporan_penjualan_${dateRange}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
+  if (loading || !reportData) return <main className="main"><p>Loading...</p></main>;
+
+  const sortedItems = Object.entries(reportData.itemsCount).sort((a, b) => b[1].qty - a[1].qty).slice(0, 10);
+
   return (
-    <main className="main">
-      <div className="section-title-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
-        <h2>📈 Laporan Penjualan</h2>
-        <button className="export-btn" onClick={handleExport} style={{ background: "#10b981", color: "white", padding: "10px 20px", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>
-          📥 Export CSV
-        </button>
+    <main className="main" style={{ display: "flex", flexDirection: "column", gap: "20px", padding: "20px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg-card)", color: "var(--text-main)", padding: "15px", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
+        <h2 style={{ margin: 0 }}>📊 Laporan Penjualan</h2>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <select value={dateRange} onChange={e => setDateRange(e.target.value)} style={{ padding: "8px", borderRadius: "6px", border: "1px solid #ccc" }}>
+            <option value="all">Semua Waktu</option>
+            <option value="today">Hari Ini</option>
+            <option value="week">7 Hari Terakhir</option>
+            <option value="month">30 Hari Terakhir</option>
+          </select>
+          <button onClick={exportToCSV} style={{ padding: "8px 15px", background: "var(--accent-primary)", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}>📥 Export CSV</button>
+        </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "2rem" }}>
-        <div className="order-history-section" style={{ padding: "20px", background: "var(--bg-card, #fff)", borderRadius: "12px" }}>
-          <h3 style={{ marginBottom: "1rem" }}>Grafik Pendapatan</h3>
-          {chartData.length > 0 ? (
-            <div style={{ width: "100%", height: 300 }}>
-              <ResponsiveContainer>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => `Rp ${value.toLocaleString("id-ID")}`} />
-                  <Legend />
-                  <Bar dataKey="revenue" name="Pendapatan (Rp)" fill="#fbbf24" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <p>Belum ada data penjualan selesai.</p>
-          )}
+      <div style={{ display: "flex", gap: "20px" }}>
+        <div style={{ flex: 1, background: "var(--bg-card)", color: "var(--text-main)", padding: "20px", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
+          <h3 style={{ color: "var(--text-muted)", fontSize: "14px", marginBottom: "10px" }}>Total Omzet</h3>
+          <p style={{ fontSize: "28px", fontWeight: "bold", margin: 0, color: "var(--text-main)" }}>Rp {reportData.totalRevenue.toLocaleString("id-ID")}</p>
+        </div>
+        <div style={{ flex: 1, background: "var(--bg-card)", color: "var(--text-main)", padding: "20px", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
+          <h3 style={{ color: "var(--text-muted)", fontSize: "14px", marginBottom: "10px" }}>Total Pesanan</h3>
+          <p style={{ fontSize: "28px", fontWeight: "bold", margin: 0, color: "#3b82f6" }}>{reportData.orders.length}</p>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: "20px" }}>
+        <div style={{ flex: 1, background: "var(--bg-card)", color: "var(--text-main)", padding: "20px", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
+          <h3 style={{ marginBottom: "15px" }}>Menu Terlaris</h3>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--border-light)", textAlign: "left" }}>
+                <th style={{ paddingBottom: "10px" }}>Menu</th>
+                <th style={{ paddingBottom: "10px", textAlign: "center" }}>Terjual</th>
+                <th style={{ paddingBottom: "10px", textAlign: "right" }}>Pendapatan</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedItems.map(([name, data], i) => (
+                <tr key={i} style={{ borderBottom: "1px solid var(--border-light)" }}>
+                  <td style={{ padding: "10px 0" }}>{name}</td>
+                  <td style={{ padding: "10px 0", textAlign: "center" }}>{data.qty}</td>
+                  <td style={{ padding: "10px 0", textAlign: "right" }}>Rp {data.revenue.toLocaleString("id-ID")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
-        <div className="order-history-section" style={{ padding: "20px", background: "var(--bg-card, #fff)", borderRadius: "12px" }}>
-          <h3 style={{ marginBottom: "1rem" }}>🔥 5 Menu Terlaris</h3>
+        <div style={{ flex: 1, background: "var(--bg-card)", color: "var(--text-main)", padding: "20px", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
+          <h3 style={{ marginBottom: "15px" }}>Metode Pembayaran</h3>
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {topItems.length > 0 ? topItems.map((item, index) => (
-              <li key={index} style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #e5e7eb" }}>
-                <span>{index + 1}. {item.name}</span>
-                <strong style={{ color: "#10b981" }}>{item.sold} porsi</strong>
+            {Object.entries(reportData.paymentMethods).map(([method, amount]) => (
+              <li key={method} style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid var(--border-light)" }}>
+                <span style={{ fontWeight: "bold", color: "#475569" }}>{method}</span>
+                <span style={{ color: "var(--text-main)" }}>Rp {amount.toLocaleString("id-ID")}</span>
               </li>
-            )) : (
-              <p>Belum ada data.</p>
-            )}
+            ))}
           </ul>
         </div>
       </div>
@@ -285,7 +306,7 @@ function FeedbacksTab({ adminToken }) {
         ) : (
           <div style={{ display: "grid", gap: "1rem" }}>
             {feedbacks.map(f => (
-              <div key={f.id} style={{ background: "var(--bg-card, #fff)", padding: "20px", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
+              <div key={f.id} style={{ background: 'var(--bg-card)', padding: "20px", borderRadius: "12px", border: '1px solid var(--border-light)' }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
                   <strong>Meja {f.table_id.replace("table-", "")}</strong>
                   <span style={{ color: "#888", fontSize: "0.9rem" }}>{new Date(f.created_at).toLocaleString("id-ID")}</span>
@@ -387,7 +408,7 @@ function POSTab({ adminToken, menu, categories }) {
   return (
     <main className="main" style={{ display: "flex", gap: "20px", height: "calc(100vh - 100px)" }}>
       {/* Menu Selection Area */}
-      <div style={{ flex: "2", display: "flex", flexDirection: "column", background: "var(--bg-card, #fff)", borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden" }}>
+      <div style={{ flex: "2", display: "flex", flexDirection: "column", background: 'var(--bg-card)', borderRadius: "12px", border: '1px solid var(--border-light)', overflow: "hidden" }}>
         <div className="menu-categories" style={{ overflowX: "auto", padding: "15px", borderBottom: "1px solid #eee", whiteSpace: "nowrap" }}>
           {categories.map((c) => (
             <button
@@ -403,7 +424,7 @@ function POSTab({ adminToken, menu, categories }) {
         
         <div style={{ flex: 1, overflowY: "auto", padding: "20px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "15px", alignContent: "start" }}>
           {filteredMenu.map((item) => (
-            <div key={item.id} onClick={() => addToCart(item)} style={{ cursor: item.available === 0 ? "not-allowed" : "pointer", opacity: item.available === 0 ? 0.5 : 1, border: "1px solid #eee", borderRadius: "10px", padding: "10px", textAlign: "center", transition: "transform 0.2s" }} onMouseOver={e => { if(item.available !== 0) e.currentTarget.style.transform = "scale(1.05)" }} onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}>
+            <div key={item.id} onClick={() => addToCart(item)} style={{ cursor: item.available === 0 ? "not-allowed" : "pointer", opacity: item.available === 0 ? 0.5 : 1, border: '1px solid var(--border-light)', borderRadius: "10px", padding: "10px", textAlign: "center", transition: "transform 0.2s" }} onMouseOver={e => { if(item.available !== 0) e.currentTarget.style.transform = "scale(1.05)" }} onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}>
               <div style={{ fontSize: "2rem", marginBottom: "10px" }}>{item.image && (item.image.startsWith("http") || item.image.startsWith("/uploads")) ? <img src={item.image} style={{ width: "100%", height: "80px", objectFit: "cover", borderRadius: "8px" }}/> : item.image}</div>
               <div style={{ fontWeight: "600", fontSize: "0.9rem", marginBottom: "5px" }}>{item.name}</div>
               <div style={{ color: "#ef4444", fontSize: "0.85rem", fontWeight: "bold" }}>Rp {item.price.toLocaleString("id-ID")}</div>
@@ -415,7 +436,7 @@ function POSTab({ adminToken, menu, categories }) {
       </div>
 
       {/* Cart Area */}
-      <div style={{ flex: "1", background: "var(--bg-card, #fff)", borderRadius: "12px", border: "1px solid #e5e7eb", display: "flex", flexDirection: "column", padding: "20px" }}>
+      <div style={{ flex: "1", background: 'var(--bg-card)', borderRadius: "12px", border: '1px solid var(--border-light)', display: "flex", flexDirection: "column", padding: "20px" }}>
         <h3 style={{ marginBottom: "15px", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>🛒 Keranjang POS</h3>
         
         <div style={{ marginBottom: "15px" }}>
@@ -439,9 +460,9 @@ function POSTab({ adminToken, menu, categories }) {
                   <div style={{ color: "#888", fontSize: "0.8rem" }}>Rp {c.price.toLocaleString("id-ID")}</div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <button onClick={() => updateQuantity(c.menuId, -1)} style={{ width: "25px", height: "25px", borderRadius: "50%", border: "1px solid #ccc", background: "#fff", cursor: "pointer" }}>-</button>
+                  <button onClick={() => updateQuantity(c.menuId, -1)} style={{ width: "25px", height: "25px", borderRadius: "50%", border: "1px solid #ccc", background: 'var(--bg-card)', color: 'var(--text-main)', cursor: "pointer" }}>-</button>
                   <span style={{ fontSize: "0.9rem", fontWeight: "600" }}>{c.quantity}</span>
-                  <button onClick={() => updateQuantity(c.menuId, 1)} style={{ width: "25px", height: "25px", borderRadius: "50%", border: "1px solid #ccc", background: "#fff", cursor: "pointer" }}>+</button>
+                  <button onClick={() => updateQuantity(c.menuId, 1)} style={{ width: "25px", height: "25px", borderRadius: "50%", border: "1px solid #ccc", background: 'var(--bg-card)', color: 'var(--text-main)', cursor: "pointer" }}>+</button>
                 </div>
               </div>
             ))
@@ -521,7 +542,7 @@ function StaffTab({ adminToken }) {
 
   return (
     <main className="main" style={{ display: "flex", gap: "20px" }}>
-      <div style={{ flex: 1, background: "var(--bg-card, #fff)", padding: "20px", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
+      <div style={{ flex: 1, background: 'var(--bg-card)', padding: "20px", borderRadius: "12px", border: '1px solid var(--border-light)' }}>
         <h3>Tambah Staf Baru</h3>
         <form onSubmit={handleAdd} style={{ marginTop: "15px", display: "flex", flexDirection: "column", gap: "10px" }}>
           <div>
@@ -546,7 +567,7 @@ function StaffTab({ adminToken }) {
         </form>
       </div>
 
-      <div style={{ flex: 2, background: "var(--bg-card, #fff)", padding: "20px", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
+      <div style={{ flex: 2, background: 'var(--bg-card)', padding: "20px", borderRadius: "12px", border: '1px solid var(--border-light)' }}>
         <h3>Daftar Staf</h3>
         <table style={{ width: "100%", marginTop: "15px", borderCollapse: "collapse" }}>
           <thead>
@@ -657,7 +678,7 @@ function SettingsTab({ adminToken }) {
 
   return (
     <main className="main" style={{ display: "flex", gap: "20px", alignItems: "flex-start", padding: "20px" }}>
-      <div style={{ flex: 1, background: "var(--bg-card, #fff)", padding: "30px", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
+      <div style={{ flex: 1, background: 'var(--bg-card)', padding: "30px", borderRadius: "12px", border: '1px solid var(--border-light)' }}>
         <h2 style={{ marginBottom: "20px", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>⚙️ Pengaturan Restoran</h2>
         <form onSubmit={handleSaveSettings} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
           <div>
@@ -693,7 +714,7 @@ function SettingsTab({ adminToken }) {
         </form>
       </div>
       
-      <div style={{ flex: 1, background: "var(--bg-card, #fff)", padding: "30px", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
+      <div style={{ flex: 1, background: 'var(--bg-card)', padding: "30px", borderRadius: "12px", border: '1px solid var(--border-light)' }}>
         <h2 style={{ marginBottom: "20px", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>🪑 Manajemen Meja</h2>
         <form onSubmit={handleAddTable} style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
           <input 
@@ -1494,7 +1515,7 @@ function App() {
                     <button className="print-btn" onClick={handlePrintReceipt}>
                       🖨️ Cetak Struk
                     </button>
-                    <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={{ padding: "10px", borderRadius: "6px", border: "1px solid #ccc", background: "#fff", cursor: "pointer", outline: "none" }}><option value="Tunai">💵 Tunai</option><option value="QRIS">📱 QRIS</option><option value="Debit">💳 Debit BCA</option><option value="Kredit">💳 Kartu Kredit</option></select><button className="confirm-pay-btn" onClick={() => handleConfirmAdminPayment(adminBillData.tableId)}>✅ Tandai Lunas</button>
+                    <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={{ padding: "10px", borderRadius: "6px", border: "1px solid #ccc", background: 'var(--bg-card)', color: 'var(--text-main)', cursor: "pointer", outline: "none" }}><option value="Tunai">💵 Tunai</option><option value="QRIS">📱 QRIS</option><option value="Debit">💳 Debit BCA</option><option value="Kredit">💳 Kartu Kredit</option></select><button className="confirm-pay-btn" onClick={() => handleConfirmAdminPayment(adminBillData.tableId)}>✅ Tandai Lunas</button>
                   </div>
                 </>
               )}
