@@ -1,45 +1,21 @@
-
 /* =========================================================
-   IZAKAYA PREMIUM RESTAURANT THEME
+   IZAKAYA KITCHEN APP - KANBAN THEME
    ========================================================= */
 
-@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;1,600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap");
 
 :root {
-  /* LIGHT MODE (Warm Cream & Crimson) */
-  --bg-main: #FDFBF7;
-  --bg-card: #FFFFFF;
-  --bg-input: #F3F1EC;
-  --bg-hover: #F0EBE1;
-  --text-main: #2D2321;
-  --text-muted: #736765;
-  --accent-primary: #D32F2F; /* Japanese Lacquer Red */
-  --accent-hover: #B71C1C;
-  --accent-secondary: #D4AF37; /* Premium Gold */
-  --border: #E8E3DB;
-  --shadow-sm: 0 2px 8px rgba(45, 35, 33, 0.05);
-  --shadow-md: 0 12px 24px -8px rgba(45, 35, 33, 0.1);
-  --shadow-glow: 0 0 20px rgba(211, 47, 47, 0.2);
-  --radius-sm: 8px;
-  --radius-md: 16px;
-  --radius-lg: 24px;
-}
-
-body.dark-theme {
-  /* DARK MODE (Slate Charcoal & Crimson) */
-  --bg-main: #0B0E14;
-  --bg-card: #151923;
-  --bg-input: #1C2230;
-  --bg-hover: #1E2535;
-  --text-main: #F3F4F6;
-  --text-muted: #9CA3AF;
-  --accent-primary: #E11D48;
-  --accent-hover: #BE123C;
-  --accent-secondary: #FBBF24;
-  --border: #2A3143;
-  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.4);
-  --shadow-glow: 0 0 20px rgba(225, 29, 72, 0.3);
+  --bg-dark: #0F172A;
+  --bg-panel: #1E293B;
+  --text-main: #F8FAFC;
+  --text-muted: #94A3B8;
+  
+  /* Status Colors for Kitchen High Contrast */
+  --status-pending: #EF4444; /* Red for urgent */
+  --status-preparing: #3B82F6; /* Blue for working */
+  --status-ready: #10B981; /* Green for done */
+  
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
 }
 
 * {
@@ -50,248 +26,396 @@ body.dark-theme {
 
 body {
   font-family: "Outfit", sans-serif;
-  background: var(--bg-main);
+  background: var(--bg-dark);
   color: var(--text-main);
-  min-height: 100vh;
-  transition: background 0.4s ease, color 0.4s ease;
-  overflow-x: hidden;
+  height: 100vh;
+  overflow: hidden; /* No scrolling on body, only inside kanban columns */
 }
 
-h1, h2, h3 {
-  font-family: "Playfair Display", serif;
-  letter-spacing: 0.5px;
+.kitchen-app-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
 }
 
-/* Inputs & Forms */
-input, select, textarea {
-  background: var(--bg-input) !important;
-  color: var(--text-main) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--radius-sm) !important;
-  padding: 12px 16px !important;
-  font-family: "Outfit", sans-serif !important;
-  transition: all 0.3s ease !important;
-  outline: none !important;
-}
-input:focus, select:focus, textarea:focus {
-  border-color: var(--accent-primary) !important;
-  box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.15) !important;
-}
-
-/* Cards (Replacing ugly white/black boxes) */
-.table-card, .stat-card, .order-card, .menu-item-admin, .category-card, .waiter-call-card, .login-container {
-  background: var(--bg-card) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--radius-md) !important;
-  box-shadow: var(--shadow-sm) !important;
-  padding: 24px !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-.table-card:hover, .menu-item-admin:hover, .order-card:hover {
-  transform: translateY(-4px) !important;
-  box-shadow: var(--shadow-md) !important;
-  border-color: var(--accent-secondary) !important;
-}
-
-/* Headers */
-.header, .admin-header {
-  background: var(--bg-card) !important;
-  border-bottom: 1px solid var(--border) !important;
-  padding: 16px 32px !important;
+/* =========================================================
+   HEADER
+   ========================================================= */
+.kitchen-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  box-shadow: var(--shadow-sm);
+  padding: 16px 24px;
+  background: var(--bg-panel);
+  border-bottom: 2px solid #334155;
+  flex-shrink: 0;
 }
 
-.header h1 {
-  font-size: 1.8rem;
-  color: var(--text-main);
+.kitchen-header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
-/* Buttons */
-button {
-  font-family: "Outfit", sans-serif !important;
-  border-radius: var(--radius-sm) !important;
-  font-weight: 600 !important;
-  padding: 10px 20px !important;
-  border: none !important;
-  cursor: pointer !important;
-  transition: all 0.2s ease !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 8px !important;
+.kitchen-header-left h1 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 1px;
 }
 
-/* Primary Button (Login, Add, Save) */
-.login-btn, .save-btn, .add-menu-btn, .confirm-pay-btn, .billing-btn {
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover)) !important;
-  color: #FFFFFF !important;
-  box-shadow: var(--shadow-glow) !important;
+.kitchen-connection-badge {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  background: rgba(0,0,0,0.3);
 }
-.login-btn:hover, .save-btn:hover, .add-menu-btn:hover {
-  transform: translateY(-2px) !important;
-  box-shadow: 0 6px 20px rgba(211, 47, 47, 0.4) !important;
-}
+.kitchen-connection-badge.connected { color: #4ADE80; }
+.kitchen-connection-badge.disconnected { color: #F87171; }
 
-/* Secondary Buttons */
-.qr-btn, .view-btn, .print-btn, .export-btn {
-  background: var(--bg-input) !important;
-  color: var(--text-main) !important;
-  border: 1px solid var(--border) !important;
-}
-.qr-btn:hover, .view-btn:hover {
-  background: var(--bg-hover) !important;
-}
-
-/* Destructive Button */
-.delete-btn, .logout-btn {
-  background: transparent !important;
-  color: var(--text-muted) !important;
-  border: 1px solid var(--border) !important;
-}
-.delete-btn:hover, .logout-btn:hover {
-  background: rgba(225, 29, 72, 0.1) !important;
-  color: var(--accent-primary) !important;
-  border-color: var(--accent-primary) !important;
-}
-
-/* Theme Toggle Button */
-.theme-toggle-btn {
-  background: var(--bg-input) !important;
-  color: var(--text-main) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 20px !important;
-  padding: 8px 16px !important;
-}
-
-/* Admin Tabs (Horizontal Scrollable) */
-.admin-tabs {
-  background: var(--bg-card) !important;
-  border-radius: var(--radius-md) !important;
-  padding: 8px !important;
-  display: flex !important;
-  gap: 8px !important;
-  border: 1px solid var(--border) !important;
-  margin: 24px 32px !important;
-  box-shadow: var(--shadow-sm) !important;
-  overflow-x: auto !important;
-}
-.tab-btn {
-  background: transparent !important;
-  color: var(--text-muted) !important;
-  border: none !important;
-  padding: 12px 24px !important;
-  font-weight: 500 !important;
-  white-space: nowrap;
-}
-.tab-btn.active {
-  background: var(--accent-primary) !important;
-  color: #FFFFFF !important;
-  box-shadow: var(--shadow-glow) !important;
-}
-
-/* Layout overrides */
-.main {
-  padding: 0 32px 32px 32px !important;
-}
-.tables-grid, .menu-grid, .waiter-calls-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+.kitchen-header-right {
+  display: flex;
+  align-items: center;
   gap: 24px;
 }
 
-/* Fix specific texts */
-.table-number {
-  font-size: 1.5rem;
-  font-family: "Playfair Display", serif;
-  font-weight: 700;
-  color: var(--text-main) !important;
-}
-.stat-value {
-  color: var(--accent-secondary) !important;
-}
-.stat-label {
-  color: var(--text-muted) !important;
-}
-td, th {
-  color: var(--text-main) !important;
-  border-bottom: 1px solid var(--border) !important;
-  padding: 16px !important;
-}
-th {
-  font-weight: 600;
-  color: var(--text-muted) !important;
-  text-transform: uppercase;
-  font-size: 0.85rem;
-  letter-spacing: 0.05em;
-}
-tr:hover td {
-  background: var(--bg-hover) !important;
-}
-
-/* Login Page Specific Fix */
-.login-container {
-  max-width: 420px;
-  margin: 100px auto;
-  text-align: center;
-}
-.login-container h2 {
-  font-size: 2rem;
-  margin-bottom: 8px;
-  color: var(--accent-primary);
-}
-.login-container p {
-  color: var(--text-muted);
-  margin-bottom: 32px;
-}
-
-/* Modals */
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.5);
+.kitchen-sound-toggle {
   display: flex;
   align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.kitchen-logout-btn {
+  background: transparent;
+  border: 2px solid #EF4444;
+  color: #EF4444;
+  padding: 8px 24px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.kitchen-logout-btn:active {
+  background: #EF4444;
+  color: #fff;
+}
+
+/* =========================================================
+   WAITER ALERTS (Horizontal Scroll at top if exist)
+   ========================================================= */
+.kitchen-waiter-alerts {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  margin: 0 24px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid #F59E0B;
+  border-radius: 12px;
+  padding: 8px 16px;
+  overflow: hidden;
+}
+
+.waiter-alert-icon {
+  font-size: 1.5rem;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.waiter-alert-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.waiter-alert-scroll::-webkit-scrollbar { display: none; }
+
+.waiter-alert-pill {
+  background: #F59E0B;
+  color: #000;
+  padding: 8px 16px;
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1.1rem;
+  white-space: nowrap;
+}
+
+.waiter-alert-pill button {
+  background: #000;
+  color: #F59E0B;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-weight: 800;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+/* =========================================================
+   KANBAN BOARD
+   ========================================================= */
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  padding: 20px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.kanban-col {
+  background: var(--bg-panel);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 2px solid transparent;
+}
+
+/* Subtle border tints for columns */
+.col-pending { border-color: rgba(239, 68, 68, 0.2); }
+.col-preparing { border-color: rgba(59, 130, 246, 0.2); }
+.col-ready { border-color: rgba(16, 185, 129, 0.2); }
+
+.kanban-col-header {
+  padding: 16px;
+  text-align: center;
+  background: rgba(0,0,0,0.2);
+  border-bottom: 2px solid rgba(255,255,255,0.05);
+}
+
+.kanban-col-header h2 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.col-pending h2 { color: var(--status-pending); }
+.col-preparing h2 { color: var(--status-preparing); }
+.col-ready h2 { color: var(--status-ready); }
+
+.kanban-cards-container {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  /* Make scrollbar thicker for fat fingers */
+  scrollbar-width: thin;
+  scrollbar-color: #475569 transparent;
+}
+.kanban-cards-container::-webkit-scrollbar { width: 12px; }
+.kanban-cards-container::-webkit-scrollbar-thumb { background: #475569; border-radius: 6px; }
+
+/* =========================================================
+   KANBAN CARDS
+   ========================================================= */
+.kanban-card {
+  background: #273449;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--shadow-card);
+  border-left: 6px solid;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Card Status Borders */
+.card-pending { border-left-color: var(--status-pending); }
+.card-preparing { border-left-color: var(--status-preparing); }
+.card-ready { border-left-color: var(--status-ready); }
+
+.kc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px dashed #475569;
+  padding-bottom: 12px;
+}
+
+.kc-table {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #fff;
+  background: #000;
+  padding: 4px 12px;
+  border-radius: 8px;
+}
+
+.kc-time {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.kc-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kc-item {
+  background: rgba(0,0,0,0.15);
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.kc-item-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.kc-qty {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  background: #475569;
+  min-width: 40px;
+  text-align: center;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.kc-name {
+  font-size: 1.4rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.kc-item-notes {
+  margin-top: 8px;
+  margin-left: 52px;
+  font-size: 1.1rem;
+  color: #FBBF24;
+  font-weight: 600;
+}
+
+.kc-global-notes {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 12px;
+  border-radius: 8px;
+  color: #FBBF24;
+  font-size: 1.1rem;
+}
+
+/* Action Button (Fat Finger Friendly) */
+.kc-action-btn {
+  width: 100%;
+  padding: 20px;
+  border: none;
+  border-radius: 10px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  transition: transform 0.1s;
+}
+
+.kc-action-btn:active {
+  transform: scale(0.97);
+}
+
+/* Button maps to the NEXT status it will trigger */
+.action-preparing {
+  background: var(--status-preparing);
+}
+.action-ready {
+  background: var(--status-ready);
+}
+.action-completed {
+  background: var(--text-muted);
+}
+
+/* Pulse animation for pending cards to grab attention */
+.card-pending {
+  animation: borderPulse 2s infinite;
+}
+
+@keyframes borderPulse {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* =========================================================
+   LOGIN PAGE
+   ========================================================= */
+.login-container {
+  display: flex;
   justify-content: center;
-  z-index: 100;
-  backdrop-filter: blur(4px);
-}
-.modal {
-  background: var(--bg-card);
-  padding: 32px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-md);
-  max-width: 500px;
-  width: 90%;
-}
-.modal-header h2 {
-  color: var(--text-main);
-  margin-bottom: 16px;
+  align-items: center;
+  height: 100vh;
+  background: var(--bg-dark);
 }
 
-/* Helper to strip ANY inline white backgrounds applied by React */
-div[style*="background: var(--bg-card)"], 
-div[style*="background: rgb(255, 255, 255)"],
-div[style*="background: #fff"] {
-  background: var(--bg-card) !important;
-  color: var(--text-main) !important;
-  border-color: var(--border) !important;
-}
-div[style*="background: var(--bg-main)"] {
-  background: transparent !important;
+.login-card {
+  background: var(--bg-panel);
+  padding: 40px;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: var(--shadow-card);
 }
 
-/* Badges */
-.badge.pending { background: rgba(245, 158, 11, 0.15) !important; color: #F59E0B !important; }
-.badge.preparing { background: rgba(59, 130, 246, 0.15) !important; color: #3B82F6 !important; }
-.badge.ready { background: rgba(16, 185, 129, 0.15) !important; color: #10B981 !important; }
-.status-empty { color: var(--text-muted); }
+.login-header h1 {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.login-form .form-group {
+  margin-bottom: 20px;
+}
+
+.login-form label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.login-form input {
+  width: 100%;
+  padding: 16px;
+  border-radius: 8px;
+  border: 2px solid #334155;
+  background: #0F172A;
+  color: #fff;
+  font-size: 1.2rem;
+}
+
+.login-form input:focus {
+  outline: none;
+  border-color: var(--status-preparing);
+}
+
+.login-btn {
+  width: 100%;
+  padding: 16px;
+  background: var(--status-preparing);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.2rem;
+  font-weight: 800;
+  cursor: pointer;
+}
