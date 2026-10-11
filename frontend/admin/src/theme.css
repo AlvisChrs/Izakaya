@@ -1,179 +1,99 @@
-/* Admin Dark Theme Overrides */
+/* =========================================================
+   IZAKAYA ADMIN - DESIGN TOKENS & DYNAMIC THEMES
+   ========================================================= */
+
+:root {
+  /* LIGHT MODE (Warm Rice Paper & Lacquer Crimson) */
+  --bg-page: #FDFBF7;
+  --bg-surface: #FFFFFF;
+  --bg-surface-elevated: #F9F7F2;
+  --bg-subtle: #F2EEE5;
+  --border-subtle: #E8E2D5;
+  --border-strong: #D1C7B5;
+  
+  --text-primary: #1C1817;
+  --text-secondary: #5C524F;
+  --text-muted: #8C817D;
+  
+  --accent-crimson: #C92A2A;
+  --accent-crimson-hover: #A51D24;
+  --accent-crimson-subtle: rgba(201, 42, 42, 0.08);
+  --accent-crimson-glow: 0 4px 16px rgba(201, 42, 42, 0.25);
+  
+  --accent-gold: #D4AF37;
+  --accent-gold-subtle: rgba(212, 175, 55, 0.12);
+
+  --sidebar-bg: #181514;
+  --sidebar-border: #2B2523;
+  --sidebar-text: #E8E2D5;
+  --sidebar-muted: #9E948C;
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-active-bg: linear-gradient(135deg, #C92A2A, #A51D24);
+
+  --status-pending: #D97706;
+  --status-pending-bg: rgba(217, 119, 6, 0.12);
+  --status-preparing: #2563EB;
+  --status-preparing-bg: rgba(37, 99, 235, 0.12);
+  --status-ready: #059669;
+  --status-ready-bg: rgba(5, 150, 105, 0.12);
+  --status-completed: #6B7280;
+  --status-completed-bg: rgba(107, 114, 128, 0.12);
+
+  --shadow-sm: 0 1px 3px rgba(28, 24, 23, 0.06), 0 1px 2px rgba(28, 24, 23, 0.04);
+  --shadow-md: 0 4px 12px rgba(28, 24, 23, 0.08);
+  --shadow-lg: 0 12px 28px rgba(28, 24, 23, 0.12);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+}
+
 body.dark-theme {
-  background-color: #121212 !important;
-  color: #e0e0e0 !important;
+  /* DARK MODE (Obsidian Ink, Charcoal Slate & Crimson) */
+  --bg-page: #0D1017;
+  --bg-surface: #151922;
+  --bg-surface-elevated: #1D2330;
+  --bg-subtle: #242B3B;
+  --border-subtle: #2A3346;
+  --border-strong: #3D4863;
+  
+  --text-primary: #F8F9FA;
+  --text-secondary: #C7CBD6;
+  --text-muted: #8892A4;
+  
+  --accent-crimson: #E03131;
+  --accent-crimson-hover: #FF5A5A;
+  --accent-crimson-subtle: rgba(224, 49, 49, 0.16);
+  --accent-crimson-glow: 0 4px 20px rgba(224, 49, 49, 0.35);
+  
+  --accent-gold: #F59E0B;
+  --accent-gold-subtle: rgba(245, 158, 11, 0.16);
+
+  --sidebar-bg: #0A0C11;
+  --sidebar-border: #1C212E;
+  --sidebar-text: #F0F3F8;
+  --sidebar-muted: #7E8797;
+  --sidebar-hover: rgba(255, 255, 255, 0.05);
+  --sidebar-active-bg: linear-gradient(135deg, #E03131, #C92A2A);
+
+  --status-pending: #FBBF24;
+  --status-pending-bg: rgba(251, 191, 36, 0.16);
+  --status-preparing: #60A5FA;
+  --status-preparing-bg: rgba(96, 165, 250, 0.16);
+  --status-ready: #34D399;
+  --status-ready-bg: rgba(52, 211, 153, 0.16);
+  --status-completed: #9CA3AF;
+  --status-completed-bg: rgba(156, 163, 175, 0.16);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
 }
 
-body.dark-theme .app {
-  background-color: #121212 !important;
-  color: #e0e0e0 !important;
-}
-
-body.dark-theme .header {
-  background: #1e1e1e !important;
-  border-bottom: 1px solid #333 !important;
-}
-
-body.dark-theme .header h1 {
-  color: #f5f5f5 !important;
-}
-
-body.dark-theme .stat {
-  background: #2a2a2a !important;
-  border-color: #444 !important;
-}
-
-body.dark-theme .stat-value {
-  color: #fbbf24 !important;
-}
-
-body.dark-theme .stat-label {
-  color: #aaa !important;
-}
-
-body.dark-theme .admin-tabs {
-  border-bottom: 1px solid #333 !important;
-}
-
-body.dark-theme .tab-btn {
-  color: #888 !important;
-}
-
-body.dark-theme .tab-btn:hover {
-  color: #ccc !important;
-}
-
-body.dark-theme .tab-btn.active {
-  color: #fbbf24 !important;
-  border-bottom-color: #fbbf24 !important;
-}
-
-body.dark-theme .table-card {
-  background: #1e1e1e !important;
-  border: 1px solid #333 !important;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important;
-}
-
-body.dark-theme .table-header {
-  border-bottom: 1px solid #333 !important;
-}
-
-body.dark-theme .table-number {
-  color: #eee !important;
-}
-
-body.dark-theme .menu-card {
-  background: #1e1e1e !important;
-  border: 1px solid #333 !important;
-}
-
-body.dark-theme .menu-item-name {
-  color: #eee !important;
-}
-
-body.dark-theme .menu-item-price {
-  color: #fbbf24 !important;
-}
-
-body.dark-theme .modal {
-  background: #1e1e1e !important;
-  color: #e0e0e0 !important;
-  border: 1px solid #333 !important;
-}
-
-body.dark-theme .modal-header h2 {
-  color: #f5f5f5 !important;
-}
-
-body.dark-theme .form-group label {
-  color: #aaa !important;
-}
-
-body.dark-theme .form-group input, 
-body.dark-theme .form-group select, 
-body.dark-theme .form-group textarea {
-  background: #2a2a2a !important;
-  border-color: #444 !important;
-  color: #eee !important;
-}
-
-body.dark-theme .order-history-section {
-  background: #1e1e1e !important;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important;
-}
-
-body.dark-theme .order-history-section h2 {
-  color: #eee !important;
-}
-
-body.dark-theme .history-table th {
-  background: #2a2a2a !important;
-  color: #bbb !important;
-  border-bottom: 1px solid #444 !important;
-}
-
-body.dark-theme .history-table td {
-  border-bottom: 1px solid #333 !important;
-  color: #ddd !important;
-}
-
-body.dark-theme .pagination button {
-  background: #2a2a2a !important;
-  border-color: #444 !important;
-  color: #eee !important;
-}
-
-body.dark-theme .pagination button:not(:disabled):hover {
-  background: #333 !important;
-}
-
-body.dark-theme .waiter-call-card {
-  background: #2a1515 !important;
-  border-left: 5px solid #ef4444 !important;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.1) !important;
-}
-
-body.dark-theme .waiter-call-type {
-  color: #eee !important;
-}
-
-body.dark-theme .login-container {
-  background: #121212 !important;
-}
-
-body.dark-theme .login-box {
-  background: #1e1e1e !important;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.5) !important;
-}
-
-body.dark-theme .login-box h1 {
-  color: #fff !important;
-}
-
-body.dark-theme .login-box p {
-  color: #aaa !important;
-}
-
-.theme-toggle-btn {
-  background: #f0f0f0;
-  border: 1px solid #ccc;
-  color: #333;
-  border-radius: 8px;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  font-weight: bold;
-  transition: 0.3s;
-  margin-left: 1rem;
-}
-.theme-toggle-btn:hover {
-  background: #e0e0e0;
-}
-
-body.dark-theme .theme-toggle-btn {
-  background: transparent;
-  border: 1px solid #444;
-  color: #fbbf24;
-}
-body.dark-theme .theme-toggle-btn:hover {
-  background: #2a2a2a;
+body {
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  transition: background-color 0.25s ease, color 0.25s ease;
 }

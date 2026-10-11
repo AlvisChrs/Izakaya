@@ -1,14 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { io } from 'socket.io-client';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './App.css';
 import './theme.css';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
 const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
-
 const ADMIN_TOKEN_KEY = 'izakaya_admin_token';
 
+/* =========================================================
+   LOGIN COMPONENT (Japanese Modern Izakaya Theme)
+   ========================================================= */
 function LoginPage({ onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -34,41 +36,58 @@ function LoginPage({ onLogin }) {
         localStorage.setItem('ADMIN_ROLE', data.role);
         onLogin({ token: data.token, role: data.role });
       } else {
-        setError(data.error || 'Akses ditolak');
+        setError(data.error || 'Akses ditolak, username atau password salah.');
       }
     } catch (err) {
       console.error(err);
-      setError('Gagal menghubungi server');
+      setError('Gagal menghubungi server restoran.');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleQuickFill = (u, p) => {
+    setUsername(u);
+    setPassword(p);
+  };
+
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <div className="login-header">
-          <h1>📊 Admin Izakaya</h1>
-          <p>Login ke Panel Admin</p>
+    <div className="login-page-wrapper">
+      <div className="login-backdrop-decor"></div>
+      <div className="login-card-container">
+        <div className="login-header-block">
+          <div className="login-seal">居</div>
+          <h1>IZAKAYA ADMIN</h1>
+          <p>Control Center & POS Restoran Modern</p>
         </div>
-        <form onSubmit={handleSubmit} className="login-form">
-          {error && <div className="login-error">{error}</div>}
-          <div className="form-group">
-            <label htmlFor="username">Username</label>
+
+        {error && (
+          <div className="login-error-alert">
+            <span>⚠️</span>
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div className="login-form-group">
+            <label htmlFor="login-username">Username</label>
             <input
-              id="username"
+              id="login-username"
+              className="login-input"
               type="text"
-              placeholder="Misal: admin"
+              placeholder="Contoh: admin, kasir, dapur"
               value={username}
               onChange={e => setUsername(e.target.value)}
               required
               autoFocus
             />
           </div>
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
+
+          <div className="login-form-group">
+            <label htmlFor="login-password">Password</label>
             <input
-              id="password"
+              id="login-password"
+              className="login-input"
               type="password"
               placeholder="Masukkan password"
               value={password}
@@ -76,20 +95,52 @@ function LoginPage({ onLogin }) {
               required
             />
           </div>
-          <button type="submit" className="login-btn" disabled={loading}>
-            {loading ? 'Masuk...' : 'Masuk'}
+
+          <button type="submit" className="login-submit-btn" disabled={loading}>
+            {loading ? 'Memverifikasi...' : 'Masuk ke Sistem'}
           </button>
         </form>
+
+        <div className="demo-credentials-section">
+          <div className="demo-credentials-title">Pilih Akun Demo (Klik untuk Isi):</div>
+          <div className="demo-chips">
+            <button
+              type="button"
+              className="demo-chip"
+              onClick={() => handleQuickFill('admin', 'admin123')}
+            >
+              👑 Superadmin
+            </button>
+            <button
+              type="button"
+              className="demo-chip"
+              onClick={() => handleQuickFill('kasir', 'kasir123')}
+            >
+              💳 Kasir
+            </button>
+            <button
+              type="button"
+              className="demo-chip"
+              onClick={() => handleQuickFill('dapur', 'dapur123')}
+            >
+              👨‍🍳 Dapur
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
+/* =========================================================
+   ORDER HISTORY COMPONENT
+   ========================================================= */
 function OrderHistoryTab({ adminToken }) {
   const [historyOrders, setHistoryOrders] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -99,8 +150,8 @@ function OrderHistoryTab({ adminToken }) {
           headers: { 'Authorization': `Bearer ${adminToken}` }
         });
         const data = await res.json();
-        setHistoryOrders(data.orders);
-        setTotalPages(data.pagination.totalPages || 1);
+        setHistoryOrders(data.orders || []);
+        setTotalPages(data.pagination?.totalPages || 1);
       } catch (err) {
         console.error(err);
       } finally {
@@ -110,79 +161,134 @@ function OrderHistoryTab({ adminToken }) {
     fetchHistory();
   }, [page, adminToken]);
 
+  const filteredOrders = useMemo(() => {
+    if (!searchTerm.trim()) return historyOrders;
+    const term = searchTerm.toLowerCase();
+    return historyOrders.filter(o => 
+      o.id.toLowerCase().includes(term) ||
+      String(o.tableNumber).toLowerCase().includes(term)
+    );
+  }, [historyOrders, searchTerm]);
+
   return (
-    <div className="order-history-section main">
-      <h2>Riwayat Pesanan</h2>
-      {loading ? <p>Memuat riwayat pesanan...</p> : (
-        <div className="table-responsive">
-          <table className="history-table">
-            <thead>
-              <tr>
-                <th>ID Pesanan</th>
-                <th>Waktu</th>
-                <th>Meja</th>
-                <th>Status</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {historyOrders.length === 0 && (
+    <div className="report-subcard" style={{ padding: '24px' }}>
+      <div className="section-header-row">
+        <div>
+          <h2>📜 Riwayat Transaksi & Pesanan</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '4px' }}>
+            Daftar lengkap transaksi yang telah dicatat sistem
+          </p>
+        </div>
+        <input
+          type="text"
+          placeholder="Cari ID / Meja..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          className="pos-search-input"
+          style={{ width: '240px' }}
+        />
+      </div>
+
+      {loading ? (
+        <p style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>Memuat data riwayat...</p>
+      ) : (
+        <>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="clean-table">
+              <thead>
                 <tr>
-                  <td colSpan="5" style={{textAlign: 'center'}}>Belum ada riwayat pesanan</td>
+                  <th>ID Pesanan</th>
+                  <th>Waktu</th>
+                  <th>Nomor Meja</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Total Pembayaran</th>
                 </tr>
-              )}
-              {historyOrders.map(o => (
-                <tr key={o.id}>
-                  <td>#{o.id.substring(0,8)}</td>
-                  <td>{new Date(o.timestamp).toLocaleString('id-ID')}</td>
-                  <td>Meja {o.tableNumber}</td>
-                  <td>
-                    <span className={`status-badge ${o.status}`}>{o.status}</span>
-                  </td>
-                  <td>Rp {o.total.toLocaleString('id-ID')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          
+              </thead>
+              <tbody>
+                {filteredOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                      Belum ada riwayat pesanan yang cocok.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredOrders.map(o => (
+                    <tr key={o.id}>
+                      <td style={{ fontWeight: '600', fontFamily: 'monospace' }}>#{o.id.substring(0, 8)}</td>
+                      <td>{new Date(o.timestamp).toLocaleString('id-ID')}</td>
+                      <td>
+                        <span style={{ fontWeight: '600' }}>Meja {o.tableNumber}</span>
+                      </td>
+                      <td>
+                        <span className={`order-chip-status ${o.status}`}>
+                          {o.status === 'completed' ? 'Selesai' : o.status}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: '700', color: 'var(--accent-crimson)' }}>
+                        Rp {o.total.toLocaleString('id-ID')}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
           {totalPages > 1 && (
-            <div className="pagination">
-              <button disabled={page === 1} onClick={() => setPage(p => p - 1)}>Sebelumnya</button>
-              <span>Halaman {page} dari {totalPages}</span>
-              <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Selanjutnya</button>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '24px' }}>
+              <button
+                disabled={page === 1}
+                onClick={() => setPage(p => p - 1)}
+                className="action-btn"
+                style={{ padding: '8px 16px' }}
+              >
+                ← Sebelumnya
+              </button>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Halaman {page} dari {totalPages}
+              </span>
+              <button
+                disabled={page >= totalPages}
+                onClick={() => setPage(p => p + 1)}
+                className="action-btn"
+                style={{ padding: '8px 16px' }}
+              >
+                Selanjutnya →
+              </button>
             </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );
 }
 
-
-
+/* =========================================================
+   SALES REPORT & ANALYTICS COMPONENT
+   ========================================================= */
 function SalesReportTab({ adminToken }) {
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [dateRange, setDateRange] = useState("all");
+  const [dateRange, setDateRange] = useState('all');
 
   const fetchReport = async () => {
     setLoading(true);
     try {
       let url = `${API_URL}/api/reports`;
-      if (dateRange !== "all") {
+      if (dateRange !== 'all') {
         const now = new Date();
         let start = now;
-        if (dateRange === "today") {
-          start = new Date(now.setHours(0,0,0,0));
-        } else if (dateRange === "week") {
+        if (dateRange === 'today') {
+          start = new Date(now.setHours(0, 0, 0, 0));
+        } else if (dateRange === 'week') {
           start = new Date(now.setDate(now.getDate() - 7));
-        } else if (dateRange === "month") {
+        } else if (dateRange === 'month') {
           start = new Date(now.setMonth(now.getMonth() - 1));
         }
         url += `?start=${start.getTime()}&end=${Date.now()}`;
       }
-      
-      const res = await fetch(url, { headers: { "Authorization": `Bearer ${adminToken}` } });
+
+      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${adminToken}` } });
       const data = await res.json();
       setReportData(data);
     } catch (err) {
@@ -194,143 +300,262 @@ function SalesReportTab({ adminToken }) {
 
   useEffect(() => {
     fetchReport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateRange]);
 
   const exportToCSV = () => {
-    if (!reportData) return;
-    const headers = ["ID Pesanan,Tanggal,Metode Pembayaran,Total"];
-    const rows = reportData.orders.map(o => `${o.id},${new Date(o.timestamp).toLocaleString("id-ID")},${o.payment_method || "Tunai"},${o.total}`);
-    const csvContent = "data:text/csv;charset=utf-8," + headers.concat(rows).join("\\n");
+    if (!reportData || !reportData.orders) return;
+    const headers = ['ID Pesanan,Tanggal,Metode Pembayaran,Total'];
+    const rows = reportData.orders.map(o => `${o.id},${new Date(o.timestamp).toLocaleString('id-ID')},${o.payment_method || 'Tunai'},${o.total}`);
+    const csvContent = 'data:text/csv;charset=utf-8,' + headers.concat(rows).join('\n');
     const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `laporan_penjualan_${dateRange}.csv`);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `laporan_penjualan_${dateRange}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  if (loading || !reportData) return <main className="main"><p>Loading...</p></main>;
+  if (loading || !reportData) {
+    return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Memuat laporan penjualan...</div>;
+  }
 
-  const sortedItems = Object.entries(reportData.itemsCount).sort((a, b) => b[1].qty - a[1].qty).slice(0, 10);
+  const sortedItems = Object.entries(reportData.itemsCount || {})
+    .sort((a, b) => b[1].qty - a[1].qty)
+    .slice(0, 10);
+
+  const totalQtySold = Object.values(reportData.itemsCount || {}).reduce((acc, cur) => acc + cur.qty, 0);
+  const avgOrderValue = reportData.orders.length > 0 
+    ? Math.round(reportData.totalRevenue / reportData.orders.length) 
+    : 0;
+
+  // Prepare chart data from payment methods
+  const chartData = Object.entries(reportData.paymentMethods || {}).map(([method, amount]) => ({
+    name: method,
+    omzet: amount
+  }));
 
   return (
-    <main className="main" style={{ display: "flex", flexDirection: "column", gap: "20px", padding: "20px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg-card)", color: "var(--text-main)", padding: "15px", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
-        <h2 style={{ margin: 0 }}>📊 Laporan Penjualan</h2>
-        <div style={{ display: "flex", gap: "10px" }}>
-          <select value={dateRange} onChange={e => setDateRange(e.target.value)} style={{ padding: "8px", borderRadius: "6px", border: "1px solid #ccc" }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Header & Filter Controls */}
+      <div className="section-header-row" style={{ background: 'var(--bg-surface)', padding: '16px 20px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)' }}>
+        <div>
+          <h2>📈 Analitik & Laporan Penjualan</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '2px' }}>
+            Pantau performa pendapatan dan menu restoran secara komprehensif
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <select
+            value={dateRange}
+            onChange={e => setDateRange(e.target.value)}
+            className="pos-cat-tab"
+            style={{ padding: '8px 16px', outline: 'none' }}
+          >
             <option value="all">Semua Waktu</option>
             <option value="today">Hari Ini</option>
             <option value="week">7 Hari Terakhir</option>
             <option value="month">30 Hari Terakhir</option>
           </select>
-          <button onClick={exportToCSV} style={{ padding: "8px 15px", background: "var(--accent-primary)", color: 'var(--text-main)', border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}>📥 Export CSV</button>
+          <button
+            onClick={exportToCSV}
+            className="table-btn-primary"
+            style={{ width: 'auto', padding: '9px 18px', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            📥 Export CSV
+          </button>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: "20px" }}>
-        <div style={{ flex: 1, background: "var(--bg-card)", color: "var(--text-main)", padding: "20px", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
-          <h3 style={{ color: "var(--text-muted)", fontSize: "14px", marginBottom: "10px" }}>Total Omzet</h3>
-          <p style={{ fontSize: "28px", fontWeight: "bold", margin: 0, color: "var(--text-main)" }}>Rp {reportData.totalRevenue.toLocaleString("id-ID")}</p>
+      {/* KPI Cards */}
+      <div className="reports-kpi-grid">
+        <div className="kpi-card">
+          <span className="kpi-label">Total Omzet</span>
+          <span className="kpi-value gold">Rp {reportData.totalRevenue.toLocaleString('id-ID')}</span>
         </div>
-        <div style={{ flex: 1, background: "var(--bg-card)", color: "var(--text-main)", padding: "20px", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
-          <h3 style={{ color: "var(--text-muted)", fontSize: "14px", marginBottom: "10px" }}>Total Pesanan</h3>
-          <p style={{ fontSize: "28px", fontWeight: "bold", margin: 0, color: 'var(--text-main)' }}>{reportData.orders.length}</p>
+        <div className="kpi-card">
+          <span className="kpi-label">Total Pesanan</span>
+          <span className="kpi-value">{reportData.orders.length} Transaksi</span>
+        </div>
+        <div className="kpi-card">
+          <span className="kpi-label">Rata-Rata Transaksi (AOV)</span>
+          <span className="kpi-value">Rp {avgOrderValue.toLocaleString('id-ID')}</span>
+        </div>
+        <div className="kpi-card">
+          <span className="kpi-label">Menu Terjual</span>
+          <span className="kpi-value">{totalQtySold} Porsi</span>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: "20px" }}>
-        <div style={{ flex: 1, background: "var(--bg-card)", color: "var(--text-main)", padding: "20px", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
-          <h3 style={{ marginBottom: "15px" }}>Menu Terlaris</h3>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      {/* Recharts Chart Visualization */}
+      <div className="reports-chart-card">
+        <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: '1.15rem', marginBottom: '20px', color: 'var(--text-primary)' }}>
+          📊 Distribusi Omzet Berdasarkan Metode Pembayaran
+        </h3>
+        <div style={{ width: '100%', height: 260 }}>
+          <ResponsiveContainer>
+            <BarChart data={chartData} margin={{ top: 10, right: 20, left: 20, bottom: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
+              <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={12} />
+              <YAxis stroke="var(--text-muted)" fontSize={12} tickFormatter={val => `Rp ${(val/1000).toFixed(0)}k`} />
+              <Tooltip 
+                formatter={(val) => [`Rp ${Number(val).toLocaleString('id-ID')}`, 'Omzet']}
+                contentStyle={{ background: 'var(--bg-surface)', borderColor: 'var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)' }}
+              />
+              <Bar dataKey="omzet" fill="var(--accent-crimson)" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Dual Column: Top Selling Items & Payment Methods */}
+      <div className="reports-dual-column">
+        <div className="report-subcard">
+          <h3>🍱 10 Menu Paling Laris</h3>
+          <table className="clean-table">
             <thead>
-              <tr style={{ borderBottom: "1px solid var(--border-light)", textAlign: "left" }}>
-                <th style={{ paddingBottom: "10px" }}>Menu</th>
-                <th style={{ paddingBottom: "10px", textAlign: "center" }}>Terjual</th>
-                <th style={{ paddingBottom: "10px", textAlign: "right" }}>Pendapatan</th>
+              <tr>
+                <th>Peringkat</th>
+                <th>Nama Menu</th>
+                <th style={{ textAlign: 'center' }}>Porsi</th>
+                <th style={{ textAlign: 'right' }}>Total Omzet</th>
               </tr>
             </thead>
             <tbody>
-              {sortedItems.map(([name, data], i) => (
-                <tr key={i} style={{ borderBottom: "1px solid var(--border-light)" }}>
-                  <td style={{ padding: "10px 0" }}>{name}</td>
-                  <td style={{ padding: "10px 0", textAlign: "center" }}>{data.qty}</td>
-                  <td style={{ padding: "10px 0", textAlign: "right" }}>Rp {data.revenue.toLocaleString("id-ID")}</td>
+              {sortedItems.map(([name, data], idx) => (
+                <tr key={name}>
+                  <td style={{ fontWeight: '700', width: '60px' }}>
+                    {idx === 0 ? '🥇 #1' : idx === 1 ? '🥈 #2' : idx === 2 ? '🥉 #3' : `#${idx + 1}`}
+                  </td>
+                  <td style={{ fontWeight: '600' }}>{name}</td>
+                  <td style={{ textAlign: 'center', color: 'var(--text-muted)' }}>{data.qty}</td>
+                  <td style={{ textAlign: 'right', fontWeight: '700', color: 'var(--accent-crimson)' }}>
+                    Rp {data.revenue.toLocaleString('id-ID')}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        <div style={{ flex: 1, background: "var(--bg-card)", color: "var(--text-main)", padding: "20px", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
-          <h3 style={{ marginBottom: "15px" }}>Metode Pembayaran</h3>
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {Object.entries(reportData.paymentMethods).map(([method, amount]) => (
-              <li key={method} style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid var(--border-light)" }}>
-                <span style={{ fontWeight: "bold", color: 'var(--text-main)' }}>{method}</span>
-                <span style={{ color: "var(--text-main)" }}>Rp {amount.toLocaleString("id-ID")}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </main>
-  );
-}
-
-
-
-function FeedbacksTab({ adminToken }) {
-  const [feedbacks, setFeedbacks] = useState([]);
-
-  useEffect(() => {
-    fetch(`${API_URL}/api/feedbacks`, { headers: { "Authorization": `Bearer ${adminToken}` } })
-      .then(res => res.json())
-      .then(data => setFeedbacks(data))
-      .catch(err => console.error(err));
-  }, [adminToken]);
-
-  const renderStars = (rating) => {
-    return "⭐".repeat(rating) + "☆".repeat(5 - rating);
-  };
-
-  return (
-    <main className="main">
-      <div className="section-title-row">
-        <h2>💬 Ulasan Pelanggan</h2>
-      </div>
-      <div className="order-history-section">
-        {feedbacks.length === 0 ? (
-          <p>Belum ada ulasan.</p>
-        ) : (
-          <div style={{ display: "grid", gap: "1rem" }}>
-            {feedbacks.map(f => (
-              <div key={f.id} style={{ background: 'var(--bg-card)', padding: "20px", borderRadius: "12px", border: '1px solid var(--border-light)' }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
-                  <strong>Meja {f.table_id.replace("table-", "")}</strong>
-                  <span style={{ color: 'var(--text-main)', fontSize: "0.9rem" }}>{new Date(f.created_at).toLocaleString("id-ID")}</span>
+        <div className="report-subcard">
+          <h3>💳 Rincian Pembayaran</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
+            {Object.entries(reportData.paymentMethods || {}).map(([method, amount]) => (
+              <div 
+                key={method}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  padding: '12px 14px',
+                  background: 'var(--bg-surface-elevated)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-subtle)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.2rem' }}>
+                    {method === 'Tunai' ? '💵' : method.includes('QRIS') ? '📱' : '💳'}
+                  </span>
+                  <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{method}</span>
                 </div>
-                <div style={{ fontSize: "1.2rem", marginBottom: "10px" }}>{renderStars(f.rating)}</div>
-                <p style={{ color: "var(--text-color, #333)", fontStyle: f.comment ? "normal" : "italic" }}>
-                  {f.comment || "Tidak ada komentar."}
-                </p>
+                <span style={{ fontWeight: '700', color: 'var(--accent-gold)' }}>
+                  Rp {amount.toLocaleString('id-ID')}
+                </span>
               </div>
             ))}
           </div>
-        )}
+        </div>
       </div>
-    </main>
+    </div>
   );
 }
 
+/* =========================================================
+   CUSTOMER FEEDBACK COMPONENT
+   ========================================================= */
+function FeedbacksTab({ adminToken }) {
+  const [feedbacks, setFeedbacks] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    fetch(`${API_URL}/api/feedbacks`, { headers: { 'Authorization': `Bearer ${adminToken}` } })
+      .then(res => res.json())
+      .then(data => setFeedbacks(data || []))
+      .catch(err => console.error(err))
+      .finally(() => setLoading(false));
+  }, [adminToken]);
 
-function POSTab({ adminToken, menu, categories }) {
+  const renderStars = (rating) => {
+    return '⭐'.repeat(rating) + '☆'.repeat(Math.max(0, 5 - rating));
+  };
+
+  return (
+    <div className="report-subcard" style={{ padding: '24px' }}>
+      <div className="section-header-row">
+        <div>
+          <h2>💬 Ulasan & Kepuasan Pelanggan</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '4px' }}>
+            Masukan langsung dari tamu yang menikmati hidangan Izakaya
+          </p>
+        </div>
+      </div>
+
+      {loading ? (
+        <p style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>Memuat ulasan pelanggan...</p>
+      ) : feedbacks.length === 0 ? (
+        <div className="ticket-empty" style={{ padding: '40px' }}>
+          <span style={{ fontSize: '2rem' }}>🍵</span>
+          <p>Belum ada ulasan yang ditinggalkan pelanggan.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+          {feedbacks.map(f => (
+            <div
+              key={f.id}
+              style={{
+                background: 'var(--bg-surface-elevated)',
+                padding: '20px',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-subtle)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: '700', fontSize: '1rem', color: 'var(--text-primary)' }}>
+                  Meja {String(f.table_id || '').replace('table-', '')}
+                </span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                  {new Date(f.created_at).toLocaleString('id-ID')}
+                </span>
+              </div>
+              <div style={{ fontSize: '1.15rem' }}>{renderStars(f.rating)}</div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', fontStyle: f.comment ? 'normal' : 'italic', lineHeight: 1.4 }}>
+                &ldquo;{f.comment || 'Pelanggan tidak meninggalkan catatan khusus.'}&rdquo;
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =========================================================
+   POS / CASHIER MODE COMPONENT (Dual-Panel Split Screen)
+   ========================================================= */
+function POSTab({ adminToken, menu, categories, tables }) {
   const [cart, setCart] = useState([]);
-  const [activeCategory, setActiveCategory] = useState(categories[0] || "");
-  const [tableName, setTableName] = useState("Walk-in / Kasir");
+  const [activeCategory, setActiveCategory] = useState(categories[0] || 'Semua');
+  const [selectedTable, setSelectedTable] = useState('Walk-in / Takeaway');
+  const [searchFilter, setSearchFilter] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const allCategories = useMemo(() => ['Semua', ...categories], [categories]);
 
   const addToCart = (item) => {
     if (item.available === 0) return;
@@ -343,7 +568,7 @@ function POSTab({ adminToken, menu, categories }) {
       }
       return [
         ...prev,
-        { menuId: item.id, name: item.name, price: item.price, quantity: 1, notes: "" },
+        { menuId: item.id, name: item.name, price: item.price, quantity: 1, notes: '' },
       ];
     });
   };
@@ -360,41 +585,50 @@ function POSTab({ adminToken, menu, categories }) {
     });
   };
 
+  const clearCart = () => setCart([]);
+
+  const filteredMenu = useMemo(() => {
+    return menu.filter((m) => {
+      const matchCat = activeCategory === 'Semua' || m.category === activeCategory;
+      const matchSearch = !searchFilter || m.name.toLowerCase().includes(searchFilter.toLowerCase());
+      return matchCat && matchSearch;
+    });
+  }, [menu, activeCategory, searchFilter]);
+
+  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
   const submitOrder = async () => {
     if (cart.length === 0) {
-      alert("Keranjang kosong!");
-      return;
-    }
-    if (!tableName.trim()) {
-      alert("Nama meja / pemesan tidak boleh kosong");
+      alert('Keranjang kasir masih kosong!');
       return;
     }
     
     setIsSubmitting(true);
     try {
-      // Create a specific API call or just simulate socket place-order
+      const isTable = selectedTable.startsWith('Meja ');
+      const tableId = isTable ? `table-${selectedTable.replace('Meja ', '')}` : `pos-${Date.now()}`;
+
       const res = await fetch(`${API_URL}/api/pos/order`, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${adminToken}`
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
         },
         body: JSON.stringify({
-          tableId: `pos-${Date.now()}`,
-          tableName: tableName,
+          tableId,
+          tableName: selectedTable,
           items: cart,
-          notes: "POS Order"
+          notes: 'POS Kasir Order'
         }),
       });
 
       if (!res.ok) {
         const d = await res.json();
-        throw new Error(d.error || "Gagal membuat pesanan");
+        throw new Error(d.error || 'Gagal membuat pesanan di kasir');
       }
 
-      alert("Pesanan berhasil dibuat!");
-      setCart([]);
-      setTableName("Walk-in / Kasir");
+      alert(`Pesanan berhasil dicatat untuk ${selectedTable}!`);
+      clearCart();
     } catch (err) {
       alert(err.message);
     } finally {
@@ -402,107 +636,168 @@ function POSTab({ adminToken, menu, categories }) {
     }
   };
 
-  const filteredMenu = menu.filter((m) => m.category === activeCategory);
-  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
   return (
-    <main className="main" style={{ display: "flex", gap: "20px", height: "calc(100vh - 100px)" }}>
-      {/* Menu Selection Area */}
-      <div style={{ flex: "2", display: "flex", flexDirection: "column", background: 'var(--bg-card)', borderRadius: "12px", border: '1px solid var(--border-light)', overflow: "hidden" }}>
-        <div className="menu-categories" style={{ overflowX: "auto", padding: "15px", borderBottom: "1px solid #eee", whiteSpace: "nowrap" }}>
-          {categories.map((c) => (
-            <button
-              key={c}
-              className={`category-btn ${activeCategory === c ? "active" : ""}`}
-              onClick={() => setActiveCategory(c)}
-              style={{ padding: "8px 16px", marginRight: "10px", borderRadius: "20px", border: "none", cursor: "pointer", background: activeCategory === c ? "#ef4444" : "#f1f5f9", color: activeCategory === c ? "#fff" : "#333" }}
-            >
-              {c}
-            </button>
-          ))}
+    <div className="pos-container">
+      {/* Left: Menu Explorer (65%) */}
+      <div className="pos-menu-panel">
+        <div className="pos-panel-header">
+          <input
+            type="text"
+            className="pos-search-input"
+            placeholder="🔍 Cari menu hidangan (contoh: Ramen, Sushi, Ocha)..."
+            value={searchFilter}
+            onChange={e => setSearchFilter(e.target.value)}
+          />
+          <div className="pos-category-tabs">
+            {allCategories.map(cat => (
+              <button
+                key={cat}
+                type="button"
+                className={`pos-cat-tab ${activeCategory === cat ? 'active' : ''}`}
+                onClick={() => setActiveCategory(cat)}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
-        
-        <div style={{ flex: 1, overflowY: "auto", padding: "20px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "15px", alignContent: "start" }}>
-          {filteredMenu.map((item) => (
-            <div key={item.id} onClick={() => addToCart(item)} style={{ cursor: item.available === 0 ? "not-allowed" : "pointer", opacity: item.available === 0 ? 0.5 : 1, border: '1px solid var(--border-light)', borderRadius: "10px", padding: "10px", textAlign: "center", transition: "transform 0.2s" }} onMouseOver={e => { if(item.available !== 0) e.currentTarget.style.transform = "scale(1.05)" }} onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}>
-              <div style={{ fontSize: "2rem", marginBottom: "10px" }}>{item.image && (item.image.startsWith("http") || item.image.startsWith("/uploads")) ? <img src={item.image} style={{ width: "100%", height: "80px", objectFit: "cover", borderRadius: "8px" }}/> : item.image}</div>
-              <div style={{ fontWeight: "600", fontSize: "0.9rem", marginBottom: "5px" }}>{item.name}</div>
-              <div style={{ color: 'var(--text-main)', fontSize: "0.85rem", fontWeight: "bold" }}>Rp {item.price.toLocaleString("id-ID")}</div>
-              {item.available === 0 && <div style={{ color: "red", fontSize: "0.75rem", marginTop: "5px" }}>Habis</div>}
-              {item.available > 0 && <div style={{ color: 'var(--text-main)', fontSize: "0.75rem", marginTop: "5px" }}>Stok: {item.available}</div>}
-            </div>
-          ))}
+
+        <div className="pos-items-grid">
+          {filteredMenu.map((item) => {
+            const inCartItem = cart.find(c => c.menuId === item.id);
+            return (
+              <div
+                key={item.id}
+                className={`pos-item-card ${item.available === 0 ? 'out-of-stock' : ''}`}
+                onClick={() => addToCart(item)}
+              >
+                <div className="pos-item-visual">
+                  {item.image && (item.image.startsWith('http') || item.image.startsWith('/uploads')) ? (
+                    <img src={item.image} alt={item.name} />
+                  ) : (
+                    <span>{item.image || '🍱'}</span>
+                  )}
+                </div>
+                <div className="pos-item-name">{item.name}</div>
+                <div className="pos-item-price">Rp {item.price.toLocaleString('id-ID')}</div>
+                <div className="pos-item-stock-tag">
+                  {item.available === 0 ? '❌ Habis' : `Stok: ${item.available || 'Tersedia'}`}
+                </div>
+                {inCartItem && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '8px',
+                    background: 'var(--accent-crimson)',
+                    color: '#FFF',
+                    fontSize: '0.72rem',
+                    fontWeight: '800',
+                    width: '22px',
+                    height: '22px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {inCartItem.quantity}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Cart Area */}
-      <div style={{ flex: "1", background: 'var(--bg-card)', borderRadius: "12px", border: '1px solid var(--border-light)', display: "flex", flexDirection: "column", padding: "20px" }}>
-        <h3 style={{ marginBottom: "15px", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>🛒 Keranjang POS</h3>
-        
-        <div style={{ marginBottom: "15px" }}>
-          <label style={{ fontSize: "0.9rem", color: 'var(--text-main)', marginBottom: "5px", display: "block" }}>Nama / Meja Pemesan</label>
-          <input 
-            type="text" 
-            value={tableName} 
-            onChange={(e) => setTableName(e.target.value)}
-            style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #ddd" }}
-          />
+      {/* Right: Cart & Ticket Summary (35%) */}
+      <div className="pos-ticket-panel">
+        <div className="ticket-header">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <h3>🛒 Tiket Kasir</h3>
+            {cart.length > 0 && (
+              <button onClick={clearCart} style={{ background: 'transparent', border: 'none', color: '#EF4444', fontSize: '0.78rem', cursor: 'pointer', fontWeight: '600' }}>
+                Kosongkan
+              </button>
+            )}
+          </div>
+          <select
+            className="ticket-table-select"
+            value={selectedTable}
+            onChange={e => setSelectedTable(e.target.value)}
+          >
+            <option value="Walk-in / Takeaway">Walk-in / Bawa Pulang (Takeaway)</option>
+            {tables.map(t => (
+              <option key={t.id} value={`Meja ${t.number}`}>Meja {t.number}</option>
+            ))}
+          </select>
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", marginBottom: "15px" }}>
+        <div className="ticket-items-list">
           {cart.length === 0 ? (
-            <p style={{ textAlign: "center", color: 'var(--text-main)', marginTop: "20px" }}>Keranjang kosong</p>
+            <div className="ticket-empty">
+              <span>🍱</span>
+              <p>Belum ada item dipilih.</p>
+              <small>Klik menu di samping untuk menambahkan.</small>
+            </div>
           ) : (
-            cart.map((c) => (
-              <div key={c.menuId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px dashed #eee" }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: "600", fontSize: "0.9rem" }}>{c.name}</div>
-                  <div style={{ color: 'var(--text-main)', fontSize: "0.8rem" }}>Rp {c.price.toLocaleString("id-ID")}</div>
+            cart.map(c => (
+              <div key={c.menuId} className="ticket-item-row">
+                <div className="ticket-item-info">
+                  <div className="ticket-item-title">{c.name}</div>
+                  <div className="ticket-item-unit-price">
+                    Rp {c.price.toLocaleString('id-ID')} &times; {c.quantity} = Rp {(c.price * c.quantity).toLocaleString('id-ID')}
+                  </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <button onClick={() => updateQuantity(c.menuId, -1)} style={{ width: "25px", height: "25px", borderRadius: "50%", border: "1px solid #ccc", background: 'var(--bg-card)', color: 'var(--text-main)', cursor: "pointer" }}>-</button>
-                  <span style={{ fontSize: "0.9rem", fontWeight: "600" }}>{c.quantity}</span>
-                  <button onClick={() => updateQuantity(c.menuId, 1)} style={{ width: "25px", height: "25px", borderRadius: "50%", border: "1px solid #ccc", background: 'var(--bg-card)', color: 'var(--text-main)', cursor: "pointer" }}>+</button>
+                <div className="ticket-qty-control">
+                  <button className="ticket-qty-btn" onClick={() => updateQuantity(c.menuId, -1)}>-</button>
+                  <span className="ticket-qty-number">{c.quantity}</span>
+                  <button className="ticket-qty-btn" onClick={() => updateQuantity(c.menuId, 1)}>+</button>
                 </div>
               </div>
             ))
           )}
         </div>
 
-        <div style={{ borderTop: "2px dashed #eee", paddingTop: "15px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "1.1rem", fontWeight: "bold", marginBottom: "15px" }}>
-            <span>Total</span>
-            <span style={{ color: 'var(--text-main)' }}>Rp {total.toLocaleString("id-ID")}</span>
+        <div className="ticket-summary-footer">
+          <div className="ticket-calc-row">
+            <span>Subtotal</span>
+            <span>Rp {subtotal.toLocaleString('id-ID')}</span>
           </div>
-          <button 
+          <div className="ticket-calc-row total">
+            <span>Total Tagihan</span>
+            <span style={{ color: 'var(--accent-gold)' }}>Rp {subtotal.toLocaleString('id-ID')}</span>
+          </div>
+          <button
+            type="button"
+            className="ticket-submit-btn"
+            disabled={cart.length === 0 || isSubmitting}
             onClick={submitOrder}
-            disabled={isSubmitting || cart.length === 0}
-            style={{ width: "100%", padding: "15px", background: (isSubmitting || cart.length === 0) ? "#ccc" : "#10b981", color: 'var(--text-main)', border: "none", borderRadius: "8px", fontSize: "1rem", fontWeight: "bold", cursor: (isSubmitting || cart.length === 0) ? "not-allowed" : "pointer" }}
           >
-            {isSubmitting ? "Memproses..." : "Buat Pesanan"}
+            {isSubmitting ? 'Memproses Pesanan...' : '✅ Buat & Proses Pesanan'}
           </button>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 
-
-
+/* =========================================================
+   STAFF MANAGEMENT COMPONENT
+   ========================================================= */
 function StaffTab({ adminToken }) {
   const [staffList, setStaffList] = useState([]);
-  const [form, setForm] = useState({ username: "", password: "", role: "kasir" });
+  const [form, setForm] = useState({ username: '', password: '', role: 'kasir' });
   const [loading, setLoading] = useState(false);
 
   const fetchStaff = () => {
-    fetch(`${API_URL}/api/staff`, { headers: { "Authorization": `Bearer ${adminToken}` } })
+    fetch(`${API_URL}/api/staff`, { headers: { 'Authorization': `Bearer ${adminToken}` } })
       .then(res => res.json())
-      .then(data => setStaffList(data))
+      .then(data => setStaffList(data || []))
       .catch(err => console.error(err));
   };
 
   useEffect(() => {
     fetchStaff();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminToken]);
 
   const handleAdd = async (e) => {
@@ -510,14 +805,14 @@ function StaffTab({ adminToken }) {
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/staff`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${adminToken}` },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
         body: JSON.stringify(form)
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Gagal");
-      alert("Staf berhasil ditambahkan");
-      setForm({ username: "", password: "", role: "kasir" });
+      if (!res.ok) throw new Error(data.error || 'Gagal menambahkan staf');
+      alert('Staf baru berhasil ditambahkan!');
+      setForm({ username: '', password: '', role: 'kasir' });
       fetchStaff();
     } catch (err) {
       alert(err.message);
@@ -527,13 +822,13 @@ function StaffTab({ adminToken }) {
   };
 
   const handleDelete = async (id, username) => {
-    if (!confirm(`Hapus akun ${username}?`)) return;
+    if (!confirm(`Hapus akun staf "${username}"?`)) return;
     try {
       const res = await fetch(`${API_URL}/api/staff/${id}`, {
-        method: "DELETE",
-        headers: { "Authorization": `Bearer ${adminToken}` }
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${adminToken}` }
       });
-      if (!res.ok) throw new Error("Gagal menghapus");
+      if (!res.ok) throw new Error('Gagal menghapus akun staf');
       fetchStaff();
     } catch (err) {
       alert(err.message);
@@ -541,83 +836,110 @@ function StaffTab({ adminToken }) {
   };
 
   return (
-    <main className="main" style={{ display: "flex", gap: "20px" }}>
-      <div style={{ flex: 1, background: 'var(--bg-card)', padding: "20px", borderRadius: "12px", border: '1px solid var(--border-light)' }}>
-        <h3>Tambah Staf Baru</h3>
-        <form onSubmit={handleAdd} style={{ marginTop: "15px", display: "flex", flexDirection: "column", gap: "10px" }}>
-          <div>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '24px' }}>
+      <div className="report-subcard">
+        <h3>➕ Tambah Akun Staf Baru</h3>
+        <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '16px' }}>
+          <div className="modal-form-group">
             <label>Username</label>
-            <input type="text" required value={form.username} onChange={e => setForm({...form, username: e.target.value})} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #ccc", marginTop: "5px" }} />
+            <input
+              type="text"
+              required
+              className="modal-input"
+              value={form.username}
+              onChange={e => setForm({ ...form, username: e.target.value })}
+              placeholder="Misal: kasir_pagi"
+            />
           </div>
-          <div>
+          <div className="modal-form-group">
             <label>Password</label>
-            <input type="password" required value={form.password} onChange={e => setForm({...form, password: e.target.value})} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #ccc", marginTop: "5px" }} />
+            <input
+              type="password"
+              required
+              className="modal-input"
+              value={form.password}
+              onChange={e => setForm({ ...form, password: e.target.value })}
+              placeholder="Minimal 6 karakter"
+            />
           </div>
-          <div>
-            <label>Role</label>
-            <select value={form.role} onChange={e => setForm({...form, role: e.target.value})} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #ccc", marginTop: "5px" }}>
+          <div className="modal-form-group">
+            <label>Peran / Role</label>
+            <select
+              value={form.role}
+              onChange={e => setForm({ ...form, role: e.target.value })}
+              className="modal-select"
+            >
               <option value="kasir">Kasir</option>
-              <option value="dapur">Dapur</option>
+              <option value="dapur">Dapur (Kitchen Display)</option>
               <option value="admin">Superadmin</option>
             </select>
           </div>
-          <button type="submit" disabled={loading} style={{ background: "#3b82f6", color: 'var(--text-main)', padding: "10px", borderRadius: "6px", border: "none", cursor: "pointer", marginTop: "10px" }}>
-            {loading ? "Menambahkan..." : "Tambah Staf"}
+          <button type="submit" disabled={loading} className="table-btn-primary">
+            {loading ? 'Menyimpan...' : 'Simpan Akun Staf'}
           </button>
         </form>
       </div>
 
-      <div style={{ flex: 2, background: 'var(--bg-card)', padding: "20px", borderRadius: "12px", border: '1px solid var(--border-light)' }}>
-        <h3>Daftar Staf</h3>
-        <table style={{ width: "100%", marginTop: "15px", borderCollapse: "collapse" }}>
+      <div className="report-subcard">
+        <h3>👥 Daftar Staf Aktif</h3>
+        <table className="clean-table" style={{ marginTop: '16px' }}>
           <thead>
-            <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
-              <th style={{ padding: "10px", borderBottom: "1px solid #ccc" }}>Username</th>
-              <th style={{ padding: "10px", borderBottom: "1px solid #ccc" }}>Role</th>
-              <th style={{ padding: "10px", borderBottom: "1px solid #ccc" }}>Aksi</th>
+            <tr>
+              <th>Username</th>
+              <th>Role</th>
+              <th style={{ textAlign: 'right' }}>Aksi</th>
             </tr>
           </thead>
           <tbody>
             {staffList.map(s => (
               <tr key={s.id}>
-                <td style={{ padding: "10px", borderBottom: "1px solid #eee" }}>{s.username}</td>
-                <td style={{ padding: "10px", borderBottom: "1px solid #eee", textTransform: "capitalize" }}>{s.role}</td>
-                <td style={{ padding: "10px", borderBottom: "1px solid #eee" }}>
-                  <button onClick={() => handleDelete(s.id, s.username)} style={{ background: "#ef4444", color: 'var(--text-main)', border: "none", padding: "5px 10px", borderRadius: "4px", cursor: "pointer" }}>Hapus</button>
+                <td style={{ fontWeight: '600' }}>{s.username}</td>
+                <td>
+                  <span className="order-chip-status preparing" style={{ textTransform: 'capitalize' }}>
+                    {s.role}
+                  </span>
+                </td>
+                <td style={{ textAlign: 'right' }}>
+                  <button
+                    onClick={() => handleDelete(s.id, s.username)}
+                    className="action-btn delete"
+                  >
+                    🗑️ Hapus
+                  </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-    </main>
+    </div>
   );
 }
 
-
-
-
+/* =========================================================
+   SETTINGS & RESTAURANT CONFIG COMPONENT
+   ========================================================= */
 function SettingsTab({ adminToken }) {
-  const [settings, setSettings] = useState({ restaurant_name: "", tax_rate: "", service_charge: "" });
+  const [settings, setSettings] = useState({ restaurant_name: '', tax_rate: '', service_charge: '' });
   const [loading, setLoading] = useState(false);
   const [tables, setTables] = useState([]);
-  const [newTableNumber, setNewTableNumber] = useState("");
+  const [newTableNumber, setNewTableNumber] = useState('');
 
   const fetchSettings = () => {
     fetch(`${API_URL}/api/settings`)
       .then(res => res.json())
       .then(data => setSettings({
-        restaurant_name: data.restaurant_name || "",
-        tax_rate: data.tax_rate || "",
-        service_charge: data.service_charge || ""
+        restaurant_name: data.restaurant_name || '',
+        tax_rate: data.tax_rate || '',
+        service_charge: data.service_charge || ''
       }))
       .catch(console.error);
   };
 
   const fetchTables = () => {
-    fetch(`${API_URL}/api/tables`, { headers: { "Authorization": `Bearer ${adminToken}` } })
+    fetch(`${API_URL}/api/tables`, { headers: { 'Authorization': `Bearer ${adminToken}` } })
       .then(res => res.json())
-      .then(data => setTables(data.sort((a, b) => a.number - b.number)))
+      .then(data => setTables((data || []).sort((a, b) => a.number - b.number)))
       .catch(console.error);
   };
 
@@ -632,12 +954,12 @@ function SettingsTab({ adminToken }) {
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/settings`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${adminToken}` },
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
         body: JSON.stringify(settings)
       });
-      if (!res.ok) throw new Error("Gagal menyimpan pengaturan");
-      alert("Pengaturan berhasil disimpan!");
+      if (!res.ok) throw new Error('Gagal menyimpan pengaturan');
+      alert('Pengaturan restoran berhasil diperbarui!');
     } catch (err) {
       alert(err.message);
     } finally {
@@ -649,13 +971,13 @@ function SettingsTab({ adminToken }) {
     e.preventDefault();
     try {
       const res = await fetch(`${API_URL}/api/tables`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${adminToken}` },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
         body: JSON.stringify({ number: newTableNumber })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Gagal menambah meja");
-      setNewTableNumber("");
+      if (!res.ok) throw new Error(data.error || 'Gagal menambah meja');
+      setNewTableNumber('');
       fetchTables();
     } catch (err) {
       alert(err.message);
@@ -666,10 +988,10 @@ function SettingsTab({ adminToken }) {
     if (!confirm(`Hapus Meja ${num}?`)) return;
     try {
       const res = await fetch(`${API_URL}/api/tables/${id}`, {
-        method: "DELETE",
-        headers: { "Authorization": `Bearer ${adminToken}` }
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${adminToken}` }
       });
-      if (!res.ok) throw new Error("Gagal menghapus meja");
+      if (!res.ok) throw new Error('Gagal menghapus meja');
       fetchTables();
     } catch (err) {
       alert(err.message);
@@ -677,73 +999,76 @@ function SettingsTab({ adminToken }) {
   };
 
   return (
-    <main className="main" style={{ display: "flex", gap: "20px", alignItems: "flex-start", padding: "20px" }}>
-      <div style={{ flex: 1, background: 'var(--bg-card)', padding: "30px", borderRadius: "12px", border: '1px solid var(--border-light)' }}>
-        <h2 style={{ marginBottom: "20px", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>⚙️ Pengaturan Restoran</h2>
-        <form onSubmit={handleSaveSettings} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-          <div>
-            <label style={{ fontWeight: "bold", marginBottom: "5px", display: "block" }}>Nama Restoran</label>
-            <input 
-              type="text" 
-              value={settings.restaurant_name} 
-              onChange={e => setSettings({...settings, restaurant_name: e.target.value})}
-              style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+      <div className="report-subcard">
+        <h3>⚙️ Pengaturan Restoran & Pajak</h3>
+        <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
+          <div className="modal-form-group">
+            <label>Nama Restoran</label>
+            <input
+              type="text"
+              value={settings.restaurant_name}
+              onChange={e => setSettings({ ...settings, restaurant_name: e.target.value })}
+              className="modal-input"
             />
           </div>
-          <div>
-            <label style={{ fontWeight: "bold", marginBottom: "5px", display: "block" }}>Pajak / PPN (%)</label>
-            <input 
-              type="number" 
-              value={settings.tax_rate} 
-              onChange={e => setSettings({...settings, tax_rate: e.target.value})}
-              style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
+          <div className="modal-form-group">
+            <label>Pajak / PPN (%)</label>
+            <input
+              type="number"
+              value={settings.tax_rate}
+              onChange={e => setSettings({ ...settings, tax_rate: e.target.value })}
+              className="modal-input"
             />
           </div>
-          <div>
-            <label style={{ fontWeight: "bold", marginBottom: "5px", display: "block" }}>Service Charge (%)</label>
-            <input 
-              type="number" 
-              value={settings.service_charge} 
-              onChange={e => setSettings({...settings, service_charge: e.target.value})}
-              style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
+          <div className="modal-form-group">
+            <label>Service Charge (%)</label>
+            <input
+              type="number"
+              value={settings.service_charge}
+              onChange={e => setSettings({ ...settings, service_charge: e.target.value })}
+              className="modal-input"
             />
           </div>
-          <button type="submit" disabled={loading} style={{ background: "#10b981", color: 'var(--text-main)', padding: "12px", borderRadius: "6px", border: "none", cursor: "pointer", marginTop: "10px", fontWeight: "bold", fontSize: "1.1rem" }}>
-            {loading ? "Menyimpan..." : "💾 Simpan Pengaturan"}
+          <button type="submit" disabled={loading} className="table-btn-primary">
+            {loading ? 'Menyimpan...' : '💾 Simpan Perubahan'}
           </button>
         </form>
       </div>
-      
-      <div style={{ flex: 1, background: 'var(--bg-card)', padding: "30px", borderRadius: "12px", border: '1px solid var(--border-light)' }}>
-        <h2 style={{ marginBottom: "20px", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>🪑 Manajemen Meja</h2>
-        <form onSubmit={handleAddTable} style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-          <input 
-            type="number" 
-            placeholder="Nomor Meja" 
-            value={newTableNumber} 
-            onChange={e => setNewTableNumber(e.target.value)} 
-            required 
-            style={{ flex: 1, padding: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
+
+      <div className="report-subcard">
+        <h3>🪑 Manajemen Nomor Meja</h3>
+        <form onSubmit={handleAddTable} style={{ display: 'flex', gap: '10px', marginTop: '16px', marginBottom: '20px' }}>
+          <input
+            type="number"
+            placeholder="Nomor Meja Baru"
+            value={newTableNumber}
+            onChange={e => setNewTableNumber(e.target.value)}
+            required
+            className="modal-input"
+            style={{ flex: 1 }}
           />
-          <button type="submit" style={{ padding: "10px 15px", background: "#3b82f6", color: 'var(--text-main)', borderRadius: "6px", border: "none", cursor: "pointer", fontWeight: "bold" }}>
-            Tambah
+          <button type="submit" className="table-btn-primary" style={{ width: 'auto', padding: '10px 20px' }}>
+            + Tambah
           </button>
         </form>
-        
-        <div style={{ maxHeight: "400px", overflowY: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+
+        <div style={{ maxHeight: '380px', overflowY: 'auto' }}>
+          <table className="clean-table">
             <thead>
-              <tr style={{ borderBottom: "1px solid #ccc", textAlign: "left" }}>
-                <th style={{ padding: "10px 0" }}>Meja</th>
-                <th style={{ padding: "10px 0", textAlign: "right" }}>Aksi</th>
+              <tr>
+                <th>Meja</th>
+                <th style={{ textAlign: 'right' }}>Aksi</th>
               </tr>
             </thead>
             <tbody>
               {tables.map(t => (
-                <tr key={t.id} style={{ borderBottom: "1px solid #eee" }}>
-                  <td style={{ padding: "10px 0" }}>Meja {t.number}</td>
-                  <td style={{ padding: "10px 0", textAlign: "right" }}>
-                    <button onClick={() => handleDeleteTable(t.id, t.number)} style={{ background: "#ef4444", color: 'var(--text-main)', padding: "5px 10px", borderRadius: "4px", border: "none", cursor: "pointer" }}>Hapus</button>
+                <tr key={t.id}>
+                  <td style={{ fontWeight: '700' }}>Meja {t.number}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    <button onClick={() => handleDeleteTable(t.id, t.number)} className="action-btn delete">
+                      🗑️ Hapus
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -751,11 +1076,13 @@ function SettingsTab({ adminToken }) {
           </table>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 
-
+/* =========================================================
+   MAIN APP CONTROLLER & SHELL
+   ========================================================= */
 function App() {
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('adminTheme') === 'dark');
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -771,7 +1098,9 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [adminToken, setAdminToken] = useState(() => localStorage.getItem(ADMIN_TOKEN_KEY));
-    const [adminRole] = useState(() => localStorage.getItem('ADMIN_ROLE') || 'admin');
+  const [adminRole] = useState(() => localStorage.getItem('ADMIN_ROLE') || 'admin');
+  
+  // Menu CRUD states
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [editingMenu, setEditingMenu] = useState(null);
   const [menuForm, setMenuForm] = useState({
@@ -779,17 +1108,20 @@ function App() {
     price: '',
     category: 'Appetizer',
     image: '🍱',
-    description: ''
+    description: '',
+    available: 100
   });
   const [imageFile, setImageFile] = useState(null);
   const [customCategory, setCustomCategory] = useState('');
   const [adminBillData, setAdminBillData] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState("Tunai");
+  const [paymentMethod, setPaymentMethod] = useState('Tunai');
 
   // Audio chime for waiter call
   const playChimeSound = () => {
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
@@ -799,7 +1131,7 @@ function App() {
       osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
       gain.gain.setValueAtTime(0.15, ctx.currentTime);
       osc.start();
-      setTimeout(() => { osc.stop(); ctx.close() }, 400);
+      setTimeout(() => { osc.stop(); ctx.close(); }, 400);
     } catch (err) {
       console.error(err);
     }
@@ -807,6 +1139,7 @@ function App() {
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem(ADMIN_TOKEN_KEY);
+    localStorage.removeItem('ADMIN_ROLE');
     setAdminToken(null);
     setSocket(null);
     setConnected(false);
@@ -818,7 +1151,18 @@ function App() {
     setAdminBillData(null);
   }, []);
 
-  // Fetch initial data via REST (requires admin token)
+  // Sync theme
+  useEffect(() => {
+    if (isDarkMode) {
+      document.body.classList.add('dark-theme');
+      localStorage.setItem('adminTheme', 'dark');
+    } else {
+      document.body.classList.remove('dark-theme');
+      localStorage.setItem('adminTheme', 'light');
+    }
+  }, [isDarkMode]);
+
+  // Fetch initial REST data
   useEffect(() => {
     if (!adminToken) return;
 
@@ -831,12 +1175,12 @@ function App() {
         ]);
         if (menuRes.ok) {
           const data = await menuRes.json();
-          setMenu(data.menu);
-          setCategories(data.categories);
+          setMenu(data.menu || []);
+          setCategories(data.categories || []);
         }
         if (tablesRes.ok) {
           const data = await tablesRes.json();
-          setTables(data);
+          setTables((data || []).sort((a, b) => a.number - b.number));
         }
       } catch (err) {
         console.error('Failed to fetch initial data:', err);
@@ -847,17 +1191,7 @@ function App() {
     fetchData();
   }, [adminToken]);
 
-  useEffect(() => {
-    if (isDarkMode) {
-      document.body.classList.add('dark-theme');
-      localStorage.setItem('adminTheme', 'dark');
-    } else {
-      document.body.classList.remove('dark-theme');
-      localStorage.setItem('adminTheme', 'light');
-    }
-  }, [isDarkMode]);
-
-  // Initialize socket for real-time updates (requires admin token)
+  // Socket Connection
   useEffect(() => {
     if (!adminToken) return;
 
@@ -870,13 +1204,13 @@ function App() {
 
     newSocket.on('connect', () => {
       setConnected(true);
-      newSocket.emit('join-kitchen'); // Admin also joins kitchen room to get orders
+      newSocket.emit('join-kitchen');
     });
 
     newSocket.on('disconnect', () => setConnected(false));
 
     newSocket.on('kitchen-orders', (orderList) => {
-      setOrders(orderList);
+      setOrders(orderList || []);
     });
 
     newSocket.on('new-order', (order) => {
@@ -892,8 +1226,8 @@ function App() {
     });
 
     newSocket.on('menu-updated', (data) => {
-      setMenu(data.menu);
-      setCategories(data.categories);
+      setMenu(data.menu || []);
+      setCategories(data.categories || []);
     });
 
     newSocket.on('admin-bill-data', (data) => {
@@ -905,7 +1239,7 @@ function App() {
     });
 
     newSocket.on('waiter-requests-updated', (requests) => {
-      setWaiterRequests(requests);
+      setWaiterRequests(requests || []);
     });
 
     newSocket.on('waiter-called', (request) => {
@@ -914,7 +1248,7 @@ function App() {
     });
 
     newSocket.on('error', ({ message }) => {
-      if (message.includes('Unauthorized')) {
+      if (message && message.includes('Unauthorized')) {
         handleLogout();
       }
     });
@@ -954,7 +1288,8 @@ function App() {
       price: '',
       category: categories.length > 0 ? categories[0] : 'Appetizer',
       image: '🍱',
-      description: ''
+      description: '',
+      available: 100
     });
     setCustomCategory('');
     setImageFile(null);
@@ -969,8 +1304,8 @@ function App() {
       category: item.category,
       image: item.image || '🍱',
       description: item.description || '',
-        available: item.available !== undefined ? item.available : 100
-      });
+      available: item.available !== undefined ? item.available : 100
+    });
     setCustomCategory('');
     setImageFile(null);
     setShowMenuModal(true);
@@ -983,7 +1318,7 @@ function App() {
         method: 'PATCH',
         headers: { 'Authorization': `Bearer ${adminToken}` }
       });
-      if (!res.ok) throw new Error('Gagal mengedit status stok');
+      if (!res.ok) throw new Error('Gagal mengedit status ketersediaan');
     } catch (err) {
       alert(err.message);
     }
@@ -991,13 +1326,13 @@ function App() {
 
   const handleDeleteMenu = async (item) => {
     if (!adminToken) return;
-    if (!window.confirm(`Yakin ingin menghapus menu "${item.name}"?`)) return;
+    if (!window.confirm(`Yakin ingin menghapus hidangan "${item.name}"?`)) return;
     try {
       const res = await fetch(`${API_URL}/api/menu/${item.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${adminToken}` }
       });
-      if (!res.ok) throw new Error('Gagal menghapus menu');
+      if (!res.ok) throw new Error('Gagal menghapus hidangan');
     } catch (err) {
       alert(err.message);
     }
@@ -1006,10 +1341,10 @@ function App() {
   const handleSaveMenu = async (e) => {
     e.preventDefault();
     if (!adminToken) return;
-    
+
     const targetCategory = menuForm.category === 'NEW' ? customCategory.trim() : menuForm.category;
     if (!menuForm.name.trim() || !menuForm.price || !targetCategory) {
-      alert('Mohon isi nama, harga, dan kategori menu!');
+      alert('Mohon lengkapi nama, harga, dan kategori hidangan!');
       return;
     }
 
@@ -1025,7 +1360,7 @@ function App() {
         });
         if (!uploadRes.ok) {
           const errData = await uploadRes.json();
-          throw new Error(errData.error || 'Gagal mengupload gambar');
+          throw new Error(errData.error || 'Gagal mengunggah foto');
         }
         const uploadData = await uploadRes.json();
         finalImageUrl = API_URL + uploadData.url;
@@ -1041,8 +1376,8 @@ function App() {
       category: targetCategory,
       image: finalImageUrl,
       description: menuForm.description.trim(),
-        available: Number(menuForm.available)
-      };
+      available: Number(menuForm.available)
+    };
 
     try {
       const url = editingMenu ? `${API_URL}/api/menu/${editingMenu.id}` : `${API_URL}/api/menu`;
@@ -1057,7 +1392,7 @@ function App() {
       });
       if (!res.ok) {
         const errData = await res.json();
-        throw new Error(errData.error || 'Gagal menyimpan menu');
+        throw new Error(errData.error || 'Gagal menyimpan hidangan');
       }
       setShowMenuModal(false);
     } catch (err) {
@@ -1069,32 +1404,16 @@ function App() {
     return orders.filter(o => o.tableId === tableId && o.status !== 'completed');
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'pending': return '#f59e0b';
-      case 'preparing': return '#3b82f6';
-      case 'ready': return '#10b981';
-      case 'completed': return '#6b7280';
-      default: return '#6b7280';
-    }
-  };
-
-  const getStatusLabel = (status) => {
-    switch (status) {
-      case 'pending': return 'Menunggu';
-      case 'preparing': return 'Memasak';
-      case 'ready': return 'Siap';
-      case 'completed': return 'Selesai';
-      default: return status;
-    }
-  };
-
   if (!adminToken) {
-    return <LoginPage onLogin={(data) => { setAdminToken(data.token); }} />;
+    return <LoginPage onLogin={(data) => setAdminToken(data.token)} />;
   }
 
   if (loading) {
-    return <div className="loading">Memuat data...</div>;
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-page)', color: 'var(--text-muted)' }}>
+        Memuat kontrol panel Izakaya...
+      </div>
+    );
   }
 
   const activeOrdersCount = orders.filter(o => o.status !== 'completed').length;
@@ -1103,358 +1422,546 @@ function App() {
     .reduce((sum, o) => sum + o.total, 0);
 
   return (
-    <div className="app">
-      <header className="header">
-        <div className="header-left">
-          <h1>📊 Admin Izakaya</h1>
-          <span className={connected ? 'connected' : 'disconnected'}>
-            {connected ? '🟢 Real-time' : '🔴 Offline'}
-          </span>
+    <div className="admin-layout">
+      {/* --------------------------------------------------
+          FIXED LEFT SIDEBAR NAVIGATION
+          -------------------------------------------------- */}
+      <aside className="admin-sidebar">
+        <div className="sidebar-brand">
+          <div className="brand-emblem">居</div>
+          <div className="brand-text">
+            <span className="brand-title">IZAKAYA</span>
+            <span className="brand-subtitle">Control Center</span>
+          </div>
         </div>
-        <div className="header-stats">
-          <div className="stat">
-            <span className="stat-value">{tables.length}</span>
-            <span className="stat-label">Meja</span>
-          </div>
-          <div className="stat">
-            <span className="stat-value">{activeOrdersCount}</span>
-            <span className="stat-label">Aktif</span>
-          </div>
-          <div className="stat revenue">
-            <span className="stat-value">Rp {totalRevenue.toLocaleString('id-ID')}</span>
-            <span className="stat-label">Pendapatan</span>
-          </div>
-          <button 
-            className="theme-toggle-btn" 
-            onClick={() => setIsDarkMode(!isDarkMode)}
+
+        <nav className="sidebar-nav">
+          <button
+            type="button"
+            className={`sidebar-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+            onClick={() => setActiveTab('dashboard')}
           >
-            {isDarkMode ? '☀️ Terang' : '🌙 Gelap'}
+            <span className="nav-icon">📊</span>
+            <span className="nav-label">Dashboard & Meja</span>
+            {activeOrdersCount > 0 && <span className="nav-badge">{activeOrdersCount}</span>}
           </button>
-          <button className="logout-btn" onClick={handleLogout}>Logout</button>
-        </div>
-      </header>
 
-      <div className="admin-tabs">
-        <button className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
-          📋 Dashboard & Menu
-        </button>
-        <button className={`tab-btn ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
-          📜 Riwayat Pesanan
-        </button>
-        <button className={`tab-btn ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>
-          📈 Laporan Penjualan
-        </button>
-        <button className={`tab-btn ${activeTab === 'feedbacks' ? 'active' : ''}`} onClick={() => setActiveTab('feedbacks')}>
-          💬 Ulasan Pelanggan
-        </button>
-        
-        {adminRole !== 'dapur' && (
-          <button className={`tab-btn ${activeTab === 'pos' ? 'active' : ''}`} onClick={() => setActiveTab('pos')}>
-            🛒 Kasir (POS)
+          <button
+            type="button"
+            className={`sidebar-nav-item ${activeTab === 'menu' ? 'active' : ''}`}
+            onClick={() => setActiveTab('menu')}
+          >
+            <span className="nav-icon">🍱</span>
+            <span className="nav-label">Manajemen Menu</span>
+            <span className="nav-badge">{menu.length}</span>
           </button>
-        )}
-        {adminRole !== 'dapur' && adminRole !== 'kasir' && (
-          <button className={`tab-btn ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>
-            📈 Laporan Penjualan
-          </button>
-        )}
-        {adminRole !== 'dapur' && adminRole !== 'kasir' && (
-          <button className={`tab-btn ${activeTab === 'staff' ? 'active' : ''}`} onClick={() => setActiveTab('staff')}>
-            👥 Manajemen Staf
-          </button>
-        )}
-        {adminRole === 'admin' && (
-          <button className={`tab-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
-            ⚙️ Pengaturan
-          </button>
-        )}
 
+          {adminRole !== 'dapur' && (
+            <button
+              type="button"
+              className={`sidebar-nav-item ${activeTab === 'pos' ? 'active' : ''}`}
+              onClick={() => setActiveTab('pos')}
+            >
+              <span className="nav-icon">🛒</span>
+              <span className="nav-label">Kasir (POS)</span>
+            </button>
+          )}
 
-      </div>
+          <button
+            type="button"
+            className={`sidebar-nav-item ${activeTab === 'history' ? 'active' : ''}`}
+            onClick={() => setActiveTab('history')}
+          >
+            <span className="nav-icon">📜</span>
+            <span className="nav-label">Riwayat Pesanan</span>
+          </button>
 
-      {activeTab === 'history' && <OrderHistoryTab adminToken={adminToken} />}
-      {activeTab === 'reports' && <SalesReportTab adminToken={adminToken} />}
-      {activeTab === 'feedbacks' && <FeedbacksTab adminToken={adminToken} />}
-      {activeTab === 'pos' && <POSTab adminToken={adminToken} menu={menu} categories={categories} />}
-      {activeTab === 'staff' && <StaffTab adminToken={adminToken} />}
-      {activeTab === 'settings' && <SettingsTab adminToken={adminToken} />}
-      
-      {activeTab === 'dashboard' && (
-      <main className="main">
-        {/* Active Waiter Calls Section */}
-        {waiterRequests.length > 0 && (
-          <section className="waiter-calls-section">
-            <div className="section-title-row">
-              <h2>🛎️ Panggilan Pelayan Aktif ({waiterRequests.length})</h2>
+          {adminRole !== 'dapur' && adminRole !== 'kasir' && (
+            <button
+              type="button"
+              className={`sidebar-nav-item ${activeTab === 'reports' ? 'active' : ''}`}
+              onClick={() => setActiveTab('reports')}
+            >
+              <span className="nav-icon">📈</span>
+              <span className="nav-label">Laporan Penjualan</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            className={`sidebar-nav-item ${activeTab === 'feedbacks' ? 'active' : ''}`}
+            onClick={() => setActiveTab('feedbacks')}
+          >
+            <span className="nav-icon">💬</span>
+            <span className="nav-label">Ulasan Pelanggan</span>
+          </button>
+
+          {adminRole === 'admin' && (
+            <button
+              type="button"
+              className={`sidebar-nav-item ${activeTab === 'staff' ? 'active' : ''}`}
+              onClick={() => setActiveTab('staff')}
+            >
+              <span className="nav-icon">👥</span>
+              <span className="nav-label">Manajemen Staf</span>
+            </button>
+          )}
+
+          {adminRole === 'admin' && (
+            <button
+              type="button"
+              className={`sidebar-nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+              onClick={() => setActiveTab('settings')}
+            >
+              <span className="nav-icon">⚙️</span>
+              <span className="nav-label">Pengaturan</span>
+            </button>
+          )}
+        </nav>
+
+        <div className="sidebar-footer">
+          <div className="user-status-card">
+            <div className="user-info">
+              <span className="user-role-tag">
+                <span>👤</span>
+                <span>{adminRole}</span>
+              </span>
+              <span className={`user-conn-status ${connected ? 'online' : 'offline'}`}>
+                {connected ? '🟢 Real-time Sockets' : '🔴 Server Offline'}
+              </span>
             </div>
-            <div className="waiter-calls-grid">
+          </div>
+
+          <button type="button" className="sidebar-logout-btn" onClick={handleLogout}>
+            <span>🚪</span>
+            <span>Keluar (Logout)</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* --------------------------------------------------
+          MAIN WORKSPACE
+          -------------------------------------------------- */}
+      <div className="admin-main">
+        {/* Top Header */}
+        <header className="admin-topbar">
+          <div className="topbar-title-group">
+            <h1>
+              {activeTab === 'dashboard' && 'Dashboard Operasional'}
+              {activeTab === 'menu' && 'Katalog Menu & Ketersediaan'}
+              {activeTab === 'pos' && 'Point of Sale (Kasir)'}
+              {activeTab === 'history' && 'Riwayat Transaksi'}
+              {activeTab === 'reports' && 'Laporan & Analitik Restoran'}
+              {activeTab === 'feedbacks' && 'Ulasan & Kepuasan Pelanggan'}
+              {activeTab === 'staff' && 'Manajemen Pengguna Staf'}
+              {activeTab === 'settings' && 'Pengaturan & Konfigurasi Restoran'}
+            </h1>
+            <p>
+              {activeTab === 'dashboard' && 'Pantau status meja makan, antrean dapur, dan panggilan tamu'}
+              {activeTab === 'menu' && 'Kelola daftar makanan, minuman, dan status ketersediaan porsi'}
+              {activeTab === 'pos' && 'Buat pesanan langsung meja & walk-in takeaway dengan cepat'}
+              {activeTab === 'history' && 'Log seluruh pesanan dan pembayaran selesai'}
+              {activeTab === 'reports' && 'Rekap pendapatan, metode bayar, dan menu terlaris'}
+              {activeTab === 'feedbacks' && 'Evaluasi pengalaman makan tamu melalui ulasan bintang'}
+              {activeTab === 'staff' && 'Kelola akun kasir, staf dapur, dan superadmin'}
+              {activeTab === 'settings' && 'Atur nama restoran, persentase pajak, service charge, dan meja'}
+            </p>
+          </div>
+
+          <div className="topbar-right">
+            <div className="topbar-metrics">
+              <div className="metric-pill">
+                <span className="metric-pill-label">Meja:</span>
+                <span className="metric-pill-value">{tables.length}</span>
+              </div>
+              <div className="metric-pill">
+                <span className="metric-pill-label">Aktif:</span>
+                <span className="metric-pill-value">{activeOrdersCount}</span>
+              </div>
+              <div className="metric-pill revenue">
+                <span className="metric-pill-label">Omzet:</span>
+                <span className="metric-pill-value">Rp {totalRevenue.toLocaleString('id-ID')}</span>
+              </div>
+              {waiterRequests.length > 0 && (
+                <div className="metric-pill alerts">
+                  <span className="metric-pill-value">🛎️ {waiterRequests.length} Panggilan</span>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="theme-toggle-btn"
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              title="Ganti Mode Tema"
+            >
+              {isDarkMode ? '☀️ Terang' : '🌙 Gelap'}
+            </button>
+          </div>
+        </header>
+
+        {/* Content View */}
+        <main className="admin-content">
+          {/* Active Waiter Calls Banner */}
+          {waiterRequests.length > 0 && (
+            <div className="waiter-banner-container">
               {waiterRequests.map(req => (
-                <div key={req.id} className="waiter-call-card">
-                  <div className="waiter-call-header">
-                    <span className="waiter-table-badge">Meja {req.tableNumber}</span>
-                    <span className="waiter-call-time">
-                      {new Date(req.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                  <div className="waiter-call-type">
-                    📌 <strong>{req.requestType}</strong>
+                <div key={req.id} className="waiter-banner-card">
+                  <div className="waiter-banner-left">
+                    <span className="waiter-bell-icon">🛎️</span>
+                    <div className="waiter-banner-info">
+                      <h3>Panggilan Pelayan: Meja {req.tableNumber}</h3>
+                      <p>
+                        Keperluan: <strong>{req.requestType}</strong> &bull;{' '}
+                        {new Date(req.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
                   </div>
                   <button
-                    className="resolve-waiter-btn"
+                    type="button"
+                    className="waiter-resolve-btn"
                     onClick={() => handleResolveWaiterRequest(req.id)}
                   >
-                    ✅ Selesai / Dilayani
+                    ✓ Tandai Selesai Dilayani
                   </button>
                 </div>
               ))}
             </div>
-          </section>
-        )}
+          )}
 
-        {/* Tables Grid */}
-        <section className="tables-section">
-          <h2>Manajemen Meja</h2>
-          <div className="tables-grid">
-            {tables.map(table => {
-              const tableOrders = getTableOrders(table.id);
-              const activeWaitReq = waiterRequests.find(r => r.tableId === table.id);
-              const pendingCount = tableOrders.filter(o => o.status === 'pending').length;
-              const preparingCount = tableOrders.filter(o => o.status === 'preparing').length;
-              const readyCount = tableOrders.filter(o => o.status === 'ready').length;
+          {/* TAB 1: DASHBOARD & TABLES */}
+          {activeTab === 'dashboard' && (
+            <div>
+              <div className="section-header-row">
+                <h2>🪑 Denah & Status Meja Restoran</h2>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  {tables.length} Total Meja Terdaftar
+                </span>
+              </div>
 
-              return (
-                <div key={table.id} className={`table-card ${activeWaitReq ? 'table-card-waiter-calling' : ''}`}>
-                  <div className="table-header">
-                    <span className="table-number">Meja {table.number}</span>
-                    <button className="qr-btn" onClick={() => showQR(table)}>📱 QR</button>
-                  </div>
+              <div className="tables-grid">
+                {tables.map(table => {
+                  const tableOrders = getTableOrders(table.id);
+                  const activeWaitReq = waiterRequests.find(r => r.tableId === table.id);
+                  const pendingCount = tableOrders.filter(o => o.status === 'pending').length;
+                  const preparingCount = tableOrders.filter(o => o.status === 'preparing').length;
+                  const readyCount = tableOrders.filter(o => o.status === 'ready').length;
 
-                  {activeWaitReq && (
-                    <div className="waiter-call-mini-badge">
-                      <span>🔔 Memanggil: <strong>{activeWaitReq.requestType}</strong></span>
-                      <button onClick={() => handleResolveWaiterRequest(activeWaitReq.id)}>✓</button>
-                    </div>
-                  )}
-
-                  <div className="table-status">
-                    {tableOrders.length === 0 ? (
-                      <span className="status-empty">Kosong</span>
-                    ) : (
-                      <div className="status-badges">
-                        {pendingCount > 0 && (
-                          <span className="badge pending">{pendingCount} Menunggu</span>
-                        )}
-                        {preparingCount > 0 && (
-                          <span className="badge preparing">{preparingCount} Memasak</span>
-                        )}
-                        {readyCount > 0 && (
-                          <span className="badge ready">{readyCount} Siap</span>
-                        )}
+                  return (
+                    <div key={table.id} className={`table-card ${activeWaitReq ? 'calling' : ''}`}>
+                      <div className="table-card-top">
+                        <div className="table-title-area">
+                          <span className="table-number-label">Meja {table.number}</span>
+                          <button
+                            type="button"
+                            className="table-qr-badge-btn"
+                            onClick={() => showQR(table)}
+                          >
+                            📱 QR
+                          </button>
+                        </div>
+                        <span className={`table-status-pill ${tableOrders.length > 0 ? 'occupied' : 'empty'}`}>
+                          {tableOrders.length > 0 ? `● ${tableOrders.length} Pesanan` : '○ Kosong'}
+                        </span>
                       </div>
-                    )}
-                  </div>
 
-                  {tableOrders.length > 0 && (
-                    <>
-                      {adminRole !== 'kasir' && getTableOrders(table.id).length > 0 && (
-                        <button onClick={(e) => {
-                          e.stopPropagation();
-                          const pending = getTableOrders(table.id).flatMap(o => JSON.parse(o.items));
-                          setAdminBillData({
-                            isKitchen: true,
-                            bill: { tableNumber: table.number, items: pending, timestamp: Date.now() }
-                          });
-                          setTimeout(() => window.print(), 200);
-                        }} style={{ width: '100%', marginTop: '5px', padding: '8px', background: '#f59e0b', color: 'var(--text-main)', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-                          👨‍🍳 Cetak Pesanan Dapur
-                        </button>
+                      {activeWaitReq && (
+                        <div style={{
+                          background: 'rgba(224, 49, 49, 0.12)',
+                          padding: '6px 10px',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '0.78rem',
+                          color: 'var(--accent-crimson)',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '10px'
+                        }}>
+                          <span>🔔 Memanggil: {activeWaitReq.requestType}</span>
+                          <button
+                            onClick={() => handleResolveWaiterRequest(activeWaitReq.id)}
+                            style={{ background: 'none', border: 'none', color: 'var(--accent-crimson)', cursor: 'pointer', fontWeight: 'bold' }}
+                          >
+                            ✓
+                          </button>
+                        </div>
                       )}
-                      <div className="table-orders">
-                        {tableOrders.map(order => (
-                          <div key={order.id} className="mini-order">
-                            <span>#{order.id.slice(0, 6)}</span>
-                            <span className="mini-status" style={{ backgroundColor: getStatusColor(order.status) }}>
-                              {getStatusLabel(order.status)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
 
-                  <div className="table-actions">
-                    {tableOrders.length > 0 && (
-                      <button className="billing-btn" onClick={() => handleRequestAdminBill(table.id)}>
-                        💳 Pembayaran
-                      </button>
-                    )}
-                    <a
-                      href={`${window.location.origin}/customer.html?table=${table.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="view-btn"
-                    >
-                      Lihat Customer
-                    </a>
+                      <div className="table-orders-summary">
+                        {tableOrders.length === 0 ? (
+                          <div className="table-empty-notice">Meja siap ditempati tamu</div>
+                        ) : (
+                          <>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                              {pendingCount > 0 && <span className="order-chip-status pending">{pendingCount} Menunggu</span>}
+                              {preparingCount > 0 && <span className="order-chip-status preparing">{preparingCount} Memasak</span>}
+                              {readyCount > 0 && <span className="order-chip-status ready">{readyCount} Siap</span>}
+                            </div>
+                            {tableOrders.map(order => (
+                              <div key={order.id} className="table-order-chip-row">
+                                <span className="order-chip-id">#{order.id.slice(0, 6)}</span>
+                                <span className={`order-chip-status ${order.status}`}>{order.status}</span>
+                              </div>
+                            ))}
+                          </>
+                        )}
+                      </div>
+
+                      <div className="table-card-actions">
+                        {tableOrders.length > 0 && (
+                          <button
+                            type="button"
+                            className="table-btn-primary"
+                            onClick={() => handleRequestAdminBill(table.id)}
+                          >
+                            💳 Pembayaran Kasir
+                          </button>
+                        )}
+                        <div className="table-action-row">
+                          {adminRole !== 'kasir' && tableOrders.length > 0 && (
+                            <button
+                              type="button"
+                              className="table-btn-secondary"
+                              onClick={() => {
+                                const pendingItems = tableOrders.flatMap(o => {
+                                  try {
+                                    return typeof o.items === 'string' ? JSON.parse(o.items) : o.items;
+                                  } catch {
+                                    return [];
+                                  }
+                                });
+                                setAdminBillData({
+                                  isKitchen: true,
+                                  bill: { tableNumber: table.number, items: pendingItems, timestamp: Date.now() }
+                                });
+                                setTimeout(() => window.print(), 200);
+                              }}
+                            >
+                              👨‍🍳 Tiket Dapur
+                            </button>
+                          )}
+                          <a
+                            href={`${window.location.origin}/customer.html?table=${table.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="table-btn-secondary"
+                          >
+                            🔗 Buka Tamu
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: MENU MANAGEMENT */}
+          {activeTab === 'menu' && (
+            <div>
+              <div className="section-header-row">
+                <div>
+                  <h2>🍱 Manajemen Katalog Menu Restoran</h2>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '2px' }}>
+                    Total {menu.length} item hidangan dalam {categories.length} kategori
+                  </p>
+                </div>
+                <button type="button" className="table-btn-primary" style={{ width: 'auto', padding: '10px 20px' }} onClick={openAddMenuModal}>
+                  ➕ Tambah Hidangan Baru
+                </button>
+              </div>
+
+              {categories.map(cat => (
+                <div key={cat} className="menu-category-section">
+                  <h3 className="menu-cat-title">{cat}</h3>
+                  <div className="menu-items-admin-grid">
+                    {menu.filter(m => m.category === cat).map(item => (
+                      <div key={item.id} className={`menu-admin-card ${item.available === 0 ? 'out-of-stock' : ''}`}>
+                        <div className="menu-admin-media">
+                          {item.image && (item.image.startsWith('http') || item.image.startsWith('/uploads')) ? (
+                            <img src={item.image} alt={item.name} />
+                          ) : (
+                            <span>{item.image || '🍱'}</span>
+                          )}
+                        </div>
+                        <div className="menu-admin-details">
+                          <div className="menu-admin-title">{item.name}</div>
+                          <div className="menu-admin-desc">{item.description || 'Tidak ada deskripsi hidangan.'}</div>
+                          <div className="menu-admin-price">Rp {item.price.toLocaleString('id-ID')}</div>
+                          <div className="menu-admin-actions">
+                            <button
+                              type="button"
+                              className={`action-btn toggle-stock ${item.available === 0 ? 'no-stock' : ''}`}
+                              onClick={() => handleToggleAvailable(item)}
+                            >
+                              {item.available === 0 ? '🔴 Habis' : '🟢 Tersedia'}
+                            </button>
+                            <button
+                              type="button"
+                              className="action-btn edit"
+                              onClick={() => openEditMenuModal(item)}
+                            >
+                              ✏️ Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="action-btn delete"
+                              onClick={() => handleDeleteMenu(item)}
+                            >
+                              🗑️ Hapus
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </section>
+              ))}
+            </div>
+          )}
 
-        {/* Menu Overview & CRUD */}
-        <section className="menu-section">
-          <div className="section-header-flex">
-            <h2>Manajemen Menu ({menu.length} item)</h2>
-            <button className="add-menu-btn" onClick={openAddMenuModal}>
-              ➕ Tambah Menu Baru
-            </button>
-          </div>
+          {/* TAB 3: POS CASHIER */}
+          {activeTab === 'pos' && (
+            <POSTab adminToken={adminToken} menu={menu} categories={categories} tables={tables} />
+          )}
 
-          <div className="menu-grid">
-            {categories.map(cat => (
-              <div key={cat} className="category-card">
-                <h3>{cat}</h3>
-                {menu.filter(m => m.category === cat).map(item => (
-                  <div key={item.id} className={`menu-item-admin ${item.available === 0 ? 'out-of-stock-item' : ''}`}>
-                    {item.image && (item.image.startsWith('http') || item.image.startsWith('/uploads')) ? (
-                      <img src={item.image} alt={item.name} className="item-image-preview" />
-                    ) : (
-                      <span className="item-emoji">{item.image}</span>
-                    )}
-                    <div className="item-details">
-                      <div className="item-title-row">
-                        <span className="item-name">{item.name}</span>
-                        {item.available === 0 && <span className="stock-badge">Habis</span>}
-                      </div>
-                      <span className="item-desc">{item.description}</span>
-                      <span className="item-price">Rp {item.price.toLocaleString('id-ID')}</span>
-                    </div>
+          {/* TAB 4: ORDER HISTORY */}
+          {activeTab === 'history' && <OrderHistoryTab adminToken={adminToken} />}
 
-                    <div className="menu-item-actions">
-                      <button
-                        className={`toggle-stock-btn ${item.available === 1 ? 'in-stock' : 'no-stock'}`}
-                        onClick={() => handleToggleAvailable(item)}
-                        title={item.available === 1 ? 'Tandai Stok Habis' : 'Tandai Tersedia'}
-                      >
-                        {item.available === 1 ? '🟢 Tersedia' : '🔴 Stok Habis'}
-                      </button>
-                      <button className="edit-btn" onClick={() => openEditMenuModal(item)} title="Edit Menu">
-                        ✏️
-                      </button>
-                      <button className="delete-btn" onClick={() => handleDeleteMenu(item)} title="Hapus Menu">
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </section>
-      </main>
-      )}
+          {/* TAB 5: SALES REPORTS */}
+          {activeTab === 'reports' && <SalesReportTab adminToken={adminToken} />}
 
+          {/* TAB 6: FEEDBACKS */}
+          {activeTab === 'feedbacks' && <FeedbacksTab adminToken={adminToken} />}
 
-      {/* Add / Edit Menu Modal */}
+          {/* TAB 7: STAFF MANAGEMENT */}
+          {activeTab === 'staff' && <StaffTab adminToken={adminToken} />}
+
+          {/* TAB 8: SETTINGS */}
+          {activeTab === 'settings' && <SettingsTab adminToken={adminToken} />}
+        </main>
+      </div>
+
+      {/* --------------------------------------------------
+          MODAL: ADD / EDIT MENU
+          -------------------------------------------------- */}
       {showMenuModal && (
         <div className="modal-overlay" onClick={() => setShowMenuModal(false)}>
-          <div className="modal form-modal" onClick={e => e.stopPropagation()}>
+          <div className="modal-card" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{editingMenu ? '✏️ Edit Menu' : '➕ Tambah Menu Baru'}</h2>
-              <button className="close-btn" onClick={() => setShowMenuModal(false)}>✕</button>
+              <h2>{editingMenu ? '✏️ Edit Hidangan Menu' : '➕ Tambah Menu Baru'}</h2>
+              <button type="button" className="modal-close-btn" onClick={() => setShowMenuModal(false)}>✕</button>
             </div>
-            <form onSubmit={handleSaveMenu} className="modal-form">
-              <div className="form-group">
-                <label>Nama Menu *</label>
+            <form onSubmit={handleSaveMenu}>
+              <div className="modal-form-group">
+                <label>Nama Hidangan *</label>
                 <input
                   type="text"
                   required
-                  placeholder="Misal: Ramen Shoyu"
+                  placeholder="Misal: Tori Paitan Ramen"
+                  className="modal-input"
                   value={menuForm.name}
                   onChange={e => setMenuForm({ ...menuForm, name: e.target.value })}
                 />
               </div>
 
-              <div className="form-group">
-                <label>Harga (Rp) *</label>
+              <div className="modal-form-group">
+                <label>Harga Satuan (Rp) *</label>
                 <input
                   type="number"
                   required
-                  min="1000"
+                  min="500"
                   step="500"
                   placeholder="Misal: 45000"
+                  className="modal-input"
                   value={menuForm.price}
                   onChange={e => setMenuForm({ ...menuForm, price: e.target.value })}
                 />
               </div>
 
-              <div className="form-group">
-                <label>Kategori *</label>
+              <div className="modal-form-group">
+                <label>Kategori Menu *</label>
                 <select
+                  className="modal-select"
                   value={menuForm.category}
                   onChange={e => setMenuForm({ ...menuForm, category: e.target.value })}
                 >
                   {categories.map(c => (
                     <option key={c} value={c}>{c}</option>
                   ))}
-                  <option value="NEW">+ Kategori Baru...</option>
+                  <option value="NEW">+ Tambah Kategori Baru...</option>
                 </select>
               </div>
 
               {menuForm.category === 'NEW' && (
-                <div className="form-group">
+                <div className="modal-form-group">
                   <label>Nama Kategori Baru *</label>
                   <input
                     type="text"
                     required
-                    placeholder="Misal: Special Yakitori"
+                    placeholder="Misal: Yakitori & Kushiyaki"
+                    className="modal-input"
                     value={customCategory}
                     onChange={e => setCustomCategory(e.target.value)}
                   />
                 </div>
               )}
 
-              <div className="form-group">
-                <label>Gambar Menu (Upload)</label>
+              <div className="modal-form-group">
+                <label>Unggah Gambar Makanan (Opsional)</label>
                 <input
                   type="file"
                   accept="image/*"
+                  className="modal-input"
                   onChange={e => {
                     if (e.target.files && e.target.files[0]) {
                       setImageFile(e.target.files[0]);
                     }
                   }}
                 />
-                <small>Atau masukkan teks/emoji jika tidak ada gambar:</small>
+                <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '6px' }}>
+                  Atau masukkan Emoji / Simbol representatif:
+                </small>
                 <input
                   type="text"
-                  placeholder="Misal: 🍜, 🍣, 🍱"
+                  placeholder="Misal: 🍜, 🍣, 🍱, 🍵"
+                  className="modal-input"
+                  style={{ marginTop: '4px' }}
                   value={menuForm.image}
                   onChange={e => setMenuForm({ ...menuForm, image: e.target.value })}
                   disabled={!!imageFile}
                 />
               </div>
 
-              <div className="form-group">
-                <label>Deskripsi</label>
+              <div className="modal-form-group">
+                <label>Deskripsi Singkat</label>
                 <textarea
                   rows={2}
-                  placeholder="Deskripsi singkat makanan/minuman..."
+                  placeholder="Penjelasan bahan, rasa, atau rempah..."
+                  className="modal-textarea"
                   value={menuForm.description}
                   onChange={e => setMenuForm({ ...menuForm, description: e.target.value })}
                 />
               </div>
 
-              <div className="form-group"><label>Stok (Porsi) *</label><input type="number" min="0" placeholder="Misal: 100" value={menuForm.available} onChange={e => setMenuForm({ ...menuForm, available: e.target.value })} /></div>
+              <div className="modal-form-group">
+                <label>Stok Tersedia (Porsi)</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="modal-input"
+                  value={menuForm.available}
+                  onChange={e => setMenuForm({ ...menuForm, available: e.target.value })}
+                />
+              </div>
 
-                <div className="form-actions">
-                  <button type="button" className="cancel-btn" onClick={() => setShowMenuModal(false)}>
+              <div className="modal-actions-row">
+                <button type="button" className="modal-cancel-btn" onClick={() => setShowMenuModal(false)}>
                   Batal
                 </button>
-                <button type="submit" className="save-btn">
-                  Simpan Menu
+                <button type="submit" className="modal-save-btn">
+                  Simpan Hidangan
                 </button>
               </div>
             </form>
@@ -1462,126 +1969,183 @@ function App() {
         </div>
       )}
 
-      {/* QR Modal */}
+      {/* --------------------------------------------------
+          MODAL: QR CODE MEJA
+          -------------------------------------------------- */}
       {showQRModal && selectedTable && (
         <div className="modal-overlay" onClick={() => setShowQRModal(false)}>
-          <div className="modal qr-modal" onClick={e => e.stopPropagation()}>
+          <div className="modal-card" style={{ maxWidth: '400px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>📱 QR Code Meja {selectedTable.number}</h2>
-              <button className="close-btn" onClick={() => setShowQRModal(false)}>✕</button>
+              <button type="button" className="modal-close-btn" onClick={() => setShowQRModal(false)}>✕</button>
             </div>
-            <div className="qr-content">
+            <div style={{ padding: '20px 0' }}>
               {qrCodeData ? (
-                <img src={qrCodeData} alt={`QR Code Meja ${selectedTable.number}`} />
+                <img
+                  src={qrCodeData}
+                  alt={`QR Code Meja ${selectedTable.number}`}
+                  style={{ width: '220px', height: '220px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}
+                />
               ) : (
-                <p>QR Code belum digenerate</p>
+                <p style={{ color: 'var(--text-muted)' }}>QR Code sedang diproses...</p>
               )}
-              <p className="qr-hint">Scan untuk membuka menu customer</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginTop: '16px' }}>
+                Pelanggan dapat memindai QR ini untuk langsung memesan dari meja.
+              </p>
+            </div>
+            <div className="modal-actions-row" style={{ justifyContent: 'center' }}>
+              <button
+                type="button"
+                className="modal-save-btn"
+                onClick={() => window.print()}
+              >
+                🖨️ Cetak QR Meja
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Admin Bill & Receipt Modal */}
-      {adminBillData && (
+      {/* --------------------------------------------------
+          MODAL: ADMIN BILLING & PAYMENT CHECKOUT
+          -------------------------------------------------- */}
+      {adminBillData && !adminBillData.isKitchen && (
         <div className="modal-overlay no-print" onClick={() => setAdminBillData(null)}>
-          <div className="modal admin-bill-modal" onClick={e => e.stopPropagation()}>
+          <div className="modal-card" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>💳 Pembayaran Meja {adminBillData.bill.tableNumber}</h2>
-              <button className="close-btn" onClick={() => setAdminBillData(null)}>✕</button>
+              <h2>💳 Pembayaran Tagihan: Meja {adminBillData.bill?.tableNumber}</h2>
+              <button type="button" className="modal-close-btn" onClick={() => setAdminBillData(null)}>✕</button>
             </div>
-            
-            <div className="admin-bill-content">
-              {adminBillData.bill.items.length === 0 ? (
-                <p>Belum ada pesanan yang Selesai (Completed) untuk dibayar.</p>
-              ) : (
-                <>
-                  <div className="bill-items">
-                    {adminBillData.bill.items.map((item, i) => (
-                      <div key={i} className="bill-item">
-                        <span>{item.name} x{item.quantity}</span>
-                        <span>Rp {(item.price * item.quantity).toLocaleString('id-ID')}</span>
-                      </div>
-                    ))}
+
+            {(!adminBillData.bill?.items || adminBillData.bill.items.length === 0) ? (
+              <p style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                Belum ada pesanan selesai yang dapat ditagih untuk meja ini.
+              </p>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto', marginBottom: '16px' }}>
+                  {adminBillData.bill.items.map((item, idx) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', borderBottom: '1px dashed var(--border-subtle)', paddingBottom: '6px' }}>
+                      <span>{item.name} &times; {item.quantity}</span>
+                      <span style={{ fontWeight: '600' }}>Rp {(item.price * item.quantity).toLocaleString('id-ID')}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--bg-surface-elevated)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span>Subtotal</span>
+                    <span>Rp {adminBillData.bill.subtotal.toLocaleString('id-ID')}</span>
                   </div>
-                  <div className="bill-summary">
-                    <div><span>Subtotal</span><span>Rp {adminBillData.bill.subtotal.toLocaleString('id-ID')}</span></div>
-                    {adminBillData.bill.service_charge > 0 && <div><span>Service {adminBillData.bill.service_rate_str}%</span><span>Rp {adminBillData.bill.service_charge.toLocaleString("id-ID")}</span></div>}
-                    <div><span>PPN {adminBillData.bill.tax_rate_str}%</span><span>Rp {adminBillData.bill.tax.toLocaleString("id-ID")}</span></div>
-                    <div className="bill-total"><span>Total</span><span>Rp {adminBillData.bill.total.toLocaleString('id-ID')}</span></div>
+                  {adminBillData.bill.service_charge > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                      <span>Service Charge ({adminBillData.bill.service_rate_str}%)</span>
+                      <span>Rp {adminBillData.bill.service_charge.toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span>PPN ({adminBillData.bill.tax_rate_str}%)</span>
+                    <span>Rp {adminBillData.bill.tax.toLocaleString('id-ID')}</span>
                   </div>
-                  
-                  <div className="admin-bill-actions">
-                    <button className="print-btn" onClick={handlePrintReceipt}>
-                      🖨️ Cetak Struk
-                    </button>
-                    <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={{ padding: "10px", borderRadius: "6px", border: "1px solid #ccc", background: 'var(--bg-card)', color: 'var(--text-main)', cursor: "pointer", outline: "none" }}><option value="Tunai">💵 Tunai</option><option value="QRIS">📱 QRIS</option><option value="Debit">💳 Debit BCA</option><option value="Kredit">💳 Kartu Kredit</option></select><button className="confirm-pay-btn" onClick={() => handleConfirmAdminPayment(adminBillData.tableId)}>✅ Tandai Lunas</button>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: '800', borderTop: '1px solid var(--border-subtle)', paddingTop: '8px', marginTop: '4px' }}>
+                    <span>Total Pembayaran</span>
+                    <span style={{ color: 'var(--accent-gold)' }}>Rp {adminBillData.bill.total.toLocaleString('id-ID')}</span>
                   </div>
-                </>
-              )}
-            </div>
+                </div>
+
+                <div className="modal-form-group">
+                  <label>Metode Pembayaran</label>
+                  <select
+                    className="modal-select"
+                    value={paymentMethod}
+                    onChange={e => setPaymentMethod(e.target.value)}
+                  >
+                    <option value="Tunai">💵 Tunai / Cash</option>
+                    <option value="QRIS">📱 QRIS BCA / GPN</option>
+                    <option value="Debit">💳 Kartu Debit BCA</option>
+                    <option value="Kredit">💳 Kartu Kredit</option>
+                  </select>
+                </div>
+
+                <div className="modal-actions-row">
+                  <button type="button" className="modal-cancel-btn" onClick={handlePrintReceipt}>
+                    🖨️ Cetak Struk
+                  </button>
+                  <button
+                    type="button"
+                    className="modal-save-btn"
+                    onClick={() => handleConfirmAdminPayment(adminBillData.tableId)}
+                  >
+                    ✅ Konfirmasi Lunas
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Print-only receipt layout */}
+      {/* --------------------------------------------------
+          PRINT THERMAL RECEIPT LAYOUT
+          -------------------------------------------------- */}
       {adminBillData && (
         <div className="print-receipt-layout print-only">
-          <div className="receipt-header">
-            <h2>🏮 Izakaya</h2>
-            <p>Meja {adminBillData.bill.tableNumber}</p>
-            <p>{new Date().toLocaleString('id-ID')}</p>
+          <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+            <h2 style={{ fontSize: '16px', margin: '0' }}>🏮 IZAKAYA RESTAURANT</h2>
+            <p style={{ margin: '2px 0' }}>Meja {adminBillData.bill?.tableNumber}</p>
+            <p style={{ margin: '2px 0', fontSize: '10px' }}>{new Date().toLocaleString('id-ID')}</p>
           </div>
-          <div className="receipt-divider">--------------------------------</div>
+          <div>--------------------------------</div>
           {adminBillData.isKitchen ? (
-            <div className="receipt-items">
-              <h3 style={{textAlign: "center", marginBottom: "10px"}}>DAPUR / KITCHEN</h3>
-              {adminBillData.bill.items.map((item, i) => (
-                <div key={i} className="receipt-item">
-                  <div style={{fontSize: "16px", fontWeight: "bold"}}>[ {item.quantity}x ] {item.name}</div>
+            <div>
+              <h3 style={{ textAlign: 'center', margin: '6px 0', fontSize: '14px' }}>PESANAN DAPUR / KITCHEN</h3>
+              {adminBillData.bill?.items?.map((item, i) => (
+                <div key={i} style={{ fontSize: '14px', fontWeight: 'bold', margin: '4px 0' }}>
+                  [ {item.quantity}x ] {item.name}
                 </div>
               ))}
             </div>
           ) : (
             <>
-              <div className="receipt-items">
-            {adminBillData.bill.items.map((item, i) => (
-              <div key={i} className="receipt-item">
-                <div>{item.name}</div>
-                <div className="receipt-item-row">
-                  <span>{item.quantity} x Rp {item.price.toLocaleString('id-ID')}</span>
-                  <span>Rp {(item.price * item.quantity).toLocaleString('id-ID')}</span>
+              <div>
+                {adminBillData.bill?.items?.map((item, i) => (
+                  <div key={i} style={{ margin: '4px 0' }}>
+                    <div>{item.name}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
+                      <span>{item.quantity} x Rp {item.price.toLocaleString('id-ID')}</span>
+                      <span>Rp {(item.price * item.quantity).toLocaleString('id-ID')}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div>--------------------------------</div>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Subtotal</span>
+                  <span>Rp {adminBillData.bill?.subtotal?.toLocaleString('id-ID')}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>PPN {adminBillData.bill?.tax_rate_str}%</span>
+                  <span>Rp {adminBillData.bill?.tax?.toLocaleString('id-ID')}</span>
+                </div>
+                {adminBillData.bill?.service_charge > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>SC {adminBillData.bill?.service_rate_str}%</span>
+                    <span>Rp {adminBillData.bill?.service_charge?.toLocaleString('id-ID')}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', marginTop: '4px' }}>
+                  <span>TOTAL</span>
+                  <span>Rp {adminBillData.bill?.total?.toLocaleString('id-ID')}</span>
                 </div>
               </div>
-            ))}
-          </div>
-          <div className="receipt-divider">--------------------------------</div>
-          <div className="receipt-summary">
-            <div className="receipt-row">
-              <span>Subtotal</span>
-              <span>Rp {adminBillData.bill.subtotal.toLocaleString('id-ID')}</span>
-            </div>
-            <div className="receipt-row">
-              <span>PPN {adminBillData.bill.tax_rate_str}%</span>
-              <span>Rp {adminBillData.bill.tax.toLocaleString("id-ID")}</span>
-            </div>
-            {adminBillData.bill.service_charge > 0 && (
-              <div className="receipt-row">
-                <span>SC {adminBillData.bill.service_rate_str}%</span>
-                <span>Rp {adminBillData.bill.service_charge.toLocaleString("id-ID")}</span>
+              <div>================================</div>
+              <div style={{ textAlign: 'center', marginTop: '8px', fontSize: '10px' }}>
+                <p>Arigatou Gozaimasu!</p>
+                <p>Terima kasih atas kunjungan Anda</p>
               </div>
-            )}
-            <div className="receipt-row receipt-total">
-              <span>TOTAL</span>
-              <span>Rp {adminBillData.bill.total.toLocaleString('id-ID')}</span>
-            </div>
-          </div>
-          <div className="receipt-divider">================================</div>
-          <div className="receipt-footer">
-            <p>Terima kasih atas kunjungan Anda!</p>
-          </div>
-          </>
-)}
+            </>
+          )}
         </div>
       )}
     </div>
