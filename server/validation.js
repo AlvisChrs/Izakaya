@@ -26,6 +26,11 @@ const schemas = {
   waiterRequest: z.object({
     tableId: z.string().min(1),
     requestType: z.string().trim().min(1).max(100)
+  }),
+  feedback: z.object({
+    tableId: z.string().trim().min(1).max(50),
+    rating: z.number().int().min(1).max(5),
+    comment: z.string().trim().max(500).optional()
   })
 };
 
@@ -42,6 +47,7 @@ const validate = {
   orderStatus: (status) => schemas.orderStatus.safeParse(status).success,
   menuInput: (data) => schemas.menuInput.safeParse(data).success,
   waiterRequest: (data) => schemas.waiterRequest.safeParse(data).success,
+  feedback: (data) => schemas.feedback.safeParse(data).success,
   generateOrderId: () => uuidv4(),
 };
 

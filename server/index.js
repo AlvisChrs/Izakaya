@@ -95,17 +95,22 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Configure Multer for image uploads
+// Configure Multer for image uploads (Strictly whitelisted raster formats)
 const uploadDir = path.join(__dirname, '../public/uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const ALLOWED_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+const ALLOWED_IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+    const rawExt = path.extname(file.originalname).toLowerCase();
+    const safeExt = ALLOWED_IMAGE_EXTENSIONS.has(rawExt) ? rawExt : '.jpg';
+    const uniqueSuffix = Date.now() + '-' + crypto.randomBytes(8).toString('hex');
+    cb(null, `menu-${uniqueSuffix}${safeExt}`);
   }
 });
 
@@ -113,10 +118,11 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ALLOWED_IMAGE_MIMES.has(file.mimetype) && ALLOWED_IMAGE_EXTENSIONS.has(ext)) {
       cb(null, true);
     } else {
-      cb(new Error('Hanya file gambar yang diizinkan!'));
+      cb(new Error('Format file tidak didukung! Hanya diperbolehkan format .jpg, .jpeg, .png, dan .webp.'));
     }
   }
 });
@@ -830,11 +836,14 @@ app.get('/api/feedbacks', auth.requireAdmin, (req, res) => {
 
 app.post('/api/feedbacks', (req, res) => {
   const { tableId, rating, comment } = req.body;
-  if (!tableId || !rating) return res.status(400).json({ error: 'Data tidak lengkap' });
+  const numRating = Number(rating);
+  if (!validate.feedback({ tableId, rating: numRating, comment })) {
+    return res.status(400).json({ error: 'Data ulasan tidak valid. Rating harus angka 1-5 dan komentar maksimal 500 karakter.' });
+  }
   
   try {
     const id = `f_${Date.now()}`;
-    s.createFeedback.run(id, tableId, rating, comment || '', Date.now());
+    s.createFeedback.run(id, String(tableId).trim(), numRating, (comment ? String(comment).trim() : ''), Date.now());
     res.status(201).json({ message: 'Terima kasih atas ulasan Anda!' });
   } catch (e) {
     console.error('Error saving feedback:', e);
