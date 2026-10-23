@@ -410,16 +410,16 @@ io.on('connection', (socket) => {
       io.to(`table-${tableId}`).emit('cash-payment-requested');
       console.log(`Cash payment requested by Table ${table.number}`);
     } else if (paymentMethod === 'qris') {
-      s.markTableOrdersCompleted.run(method, tableId);
+      s.markTableOrdersCompleted.run('QRIS', tableId);
       io.to(`table-${tableId}`).emit('payment-confirmed');
       io.to('kitchen').emit('orders-completed', { tableId, tableNumber: table.number });
       console.log(`QRIS Payment confirmed for table ${table.number}`);
     }
   }));
 
-  // Admin requests bill for printing
+  // Admin / Kasir requests bill for printing
   socket.on('admin-request-bill', wrapHandler(socket, 'admin-request-bill', (tableId) => {
-    if (socket.data.staffRole !== 'admin' && socket.data.staffRole !== 'kitchen') {
+    if (socket.data.staffRole !== 'admin' && socket.data.staffRole !== 'kitchen' && socket.data.staffRole !== 'kasir') {
       socket.emit('error', { message: 'Unauthorized: Staff token required' });
       return;
     }
@@ -448,11 +448,11 @@ io.on('connection', (socket) => {
     socket.emit('admin-bill-data', { tableId, bill });
   }));
 
-  // Admin manually confirms payment
+  // Admin / Kasir manually confirms payment
   socket.on('admin-confirm-payment', wrapHandler(socket, 'admin-confirm-payment', (data) => {
-      const tableId = typeof data === 'object' ? data.tableId : data;
-      const method = typeof data === 'object' && data.method ? data.method : 'Tunai';
-    if (socket.data.staffRole !== 'admin' && socket.data.staffRole !== 'kitchen') {
+    const tableId = typeof data === 'object' ? data.tableId : data;
+    const method = typeof data === 'object' && data.method ? data.method : 'Tunai';
+    if (socket.data.staffRole !== 'admin' && socket.data.staffRole !== 'kitchen' && socket.data.staffRole !== 'kasir') {
       socket.emit('error', { message: 'Unauthorized: Staff token required' });
       return;
     }
@@ -460,10 +460,10 @@ io.on('connection', (socket) => {
     const table = s.getTable.get(tableId);
     if (!table) return;
 
-    s.markTableOrdersCompleted.run(tableId);
+    s.markTableOrdersCompleted.run(method, tableId);
     io.to(`table-${tableId}`).emit('payment-confirmed');
     io.to('kitchen').emit('orders-completed', { tableId, tableNumber: table.number });
-    console.log(`Manual Payment confirmed by Admin for table ${table.number}`);
+    console.log(`Payment (${method}) confirmed by Staff for table ${table.number}`);
   }));
 
   socket.on('disconnect', () => {

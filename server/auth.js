@@ -1,9 +1,14 @@
 require('dotenv').config();
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'izakaya_fallback_secret_key_123!';
-
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL SECURITY ERROR: JWT_SECRET must be set in production environment!');
+  }
+  console.warn('[SECURITY WARNING] JWT_SECRET is not set in .env. Generating ephemeral secure key for this session.');
+  JWT_SECRET = crypto.randomBytes(32).toString('hex');
+}
 // Generate JWT token for a user
 function generateToken(user) {
   return jwt.sign(
