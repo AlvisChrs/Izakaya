@@ -129,6 +129,15 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
+// Specific brute-force protection for login endpoint
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // limit to 10 login attempts per 15 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Terlalu banyak percobaan login gagal. Mohon tunggu 15 menit sebelum mencoba kembali.' }
+});
+
 // Memory store for active waiter calls
 let activeWaiterRequests = [];
 // Cooldown map for call-waiter to prevent spam
@@ -480,8 +489,8 @@ function broadcastMenuUpdated() {
 
 // REST endpoints
 
-// Auth: Login endpoint
-app.post('/api/login', (req, res) => {
+// Auth: Login endpoint (protected against brute-force)
+app.post('/api/login', loginLimiter, (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: 'Username dan password wajib diisi' });
@@ -514,7 +523,7 @@ app.post('/api/upload', auth.requireAdmin, (req, res, next) => {
   res.json({ url: fileUrl });
 });
 
-app.get('/api/menu', auth.requireAdmin, (req, res) => {
+app.get('/api/menu', auth.requireStaff, (req, res) => {
   const menu = s.getAllMenu.all();
   const categories = s.getMenuCategories.all().map(c => c.category);
   res.json({ menu, categories });
@@ -643,12 +652,12 @@ app.delete('/api/tables/:tableId', auth.requireAdmin, (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-app.get('/api/tables', auth.requireAdmin, (req, res) => {
+app.get('/api/tables', auth.requireStaff, (req, res) => {
   const tableList = s.getAllTables.all();
   res.json(tableList);
 });
 
-app.get('/api/tables/:tableId', auth.requireAdmin, (req, res) => {
+app.get('/api/tables/:tableId', auth.requireStaff, (req, res) => {
   const table = db.getTableWithOrders(req.params.tableId);
   if (table) {
     const menu = s.getAllMenu.all();
@@ -835,7 +844,7 @@ app.post('/api/feedbacks', (req, res) => {
 
 
 // POS / Kasir Order endpoint
-app.post("/api/pos/order", auth.requireAdmin, express.json(), (req, res) => {
+app.post("/api/pos/order", auth.requireStaff, express.json(), (req, res) => {
   const { tableId, tableName, items, notes } = req.body;
   if (!items || !items.length) return res.status(400).json({ error: "Keranjang kosong" });
   

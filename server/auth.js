@@ -87,11 +87,11 @@ function requireKitchen(req, res, next) {
   next();
 }
 
-// Middleware: require either admin OR kitchen token
+// Middleware: require either admin, kitchen, or kasir token
 function requireStaff(req, res, next) {
   const token = extractToken(req);
   const role = getStaffRole(token);
-  if (role === 'admin' || role === 'kitchen') {
+  if (role === 'admin' || role === 'kitchen' || role === 'kasir') {
     return next();
   }
   return res.status(401).json({ error: 'Unauthorized: Staff token required' });
@@ -121,7 +121,7 @@ function kitchenSocketMiddleware(socket, next) {
 function staffSocketMiddleware(socket, next) {
   const token = socket.handshake.auth.token || socket.handshake.query.token;
   const role = getStaffRole(token);
-  if (role === 'admin' || role === 'kitchen') {
+  if (role === 'admin' || role === 'kitchen' || role === 'kasir') {
     socket.userRole = role;
     return next();
   }
