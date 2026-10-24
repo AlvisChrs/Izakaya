@@ -148,6 +148,8 @@ const loginLimiter = rateLimit({
 let activeWaiterRequests = [];
 // Cooldown map for call-waiter to prevent spam
 const callWaiterCooldown = new Map();
+// Cooldown map for place-order to prevent rapid order flooding
+const placeOrderCooldown = new Map();
 
 // Helper: wrap socket handler with try-catch so one bad event never crashes the server
 function wrapHandler(socket, eventName, handler) {
@@ -289,6 +291,16 @@ io.on('connection', (socket) => {
   // Customer places order
   socket.on('place-order', wrapHandler(socket, 'place-order', ({ tableId, items, notes }) => {
     if (!validate.tableId(tableId) || !requireTableSession(tableId)) return;
+
+    // Cooldown check: prevent automated rapid order flooding (3 seconds)
+    const now = Date.now();
+    const lastOrder = placeOrderCooldown.get(tableId) || 0;
+    if (now - lastOrder < 3000) {
+      socket.emit('error', { message: 'Mohon tunggu beberapa detik sebelum mengirim pesanan berikutnya.' });
+      return;
+    }
+    placeOrderCooldown.set(tableId, now);
+
     if (!validate.menuItems(items)) {
       socket.emit('error', { message: 'Invalid order items' });
       return;
@@ -982,8 +994,12 @@ app.get("/api/reports", auth.requireAdmin, (req, res) => {
     let query = "SELECT * FROM orders WHERE status = 'completed'";
     let params = [];
     if (start && end) {
-      query += " AND timestamp >= ? AND timestamp <= ?";
-      params.push(parseInt(start), parseInt(end));
+      const startTs = parseInt(start, 10);
+      const endTs = parseInt(end, 10);
+      if (!isNaN(startTs) && !isNaN(endTs) && startTs > 0 && endTs >= startTs) {
+        query += " AND timestamp >= ? AND timestamp <= ?";
+        params.push(startTs, endTs);
+      }
     }
     
     // We can access db through the getStatements if we export it, or just add a new exported function
