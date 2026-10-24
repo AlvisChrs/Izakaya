@@ -144,9 +144,14 @@ function init() {
   // Seed users if empty
   const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get().c;
   if (userCount === 0) {
+    const defaultAdminPass = process.env.INITIAL_ADMIN_PASSWORD || 'admin123';
+    const defaultKitchenPass = process.env.INITIAL_KITCHEN_PASSWORD || 'kitchen123';
+    if (!process.env.INITIAL_ADMIN_PASSWORD && process.env.NODE_ENV === 'production') {
+      console.warn('[SECURITY WARNING] Running in production with default admin credentials! Please set INITIAL_ADMIN_PASSWORD in .env.');
+    }
     const insertUser = db.prepare('INSERT INTO users (id, username, password_hash, role) VALUES (?, ?, ?, ?)');
-    const adminHash = bcrypt.hashSync('admin123', 10);
-    const kitchenHash = bcrypt.hashSync('kitchen123', 10);
+    const adminHash = bcrypt.hashSync(defaultAdminPass, 10);
+    const kitchenHash = bcrypt.hashSync(defaultKitchenPass, 10);
     insertUser.run('u1', 'admin', adminHash, 'admin');
     insertUser.run('u2', 'kitchen', kitchenHash, 'kitchen');
   }

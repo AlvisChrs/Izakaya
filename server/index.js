@@ -32,8 +32,33 @@ function getCurrentSettings() {
 
 const app = express();
 const server = http.createServer(app);
+
+// Allowed origins configuration (configurable via CORS_ORIGIN in .env)
+const allowedOrigins = process.env.CORS_ORIGIN 
+  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+  : null;
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. mobile apps, curl, same-origin)
+    if (!origin || !allowedOrigins || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      return callback(null, true);
+    }
+    return callback(new Error('Blocked by CORS policy: Origin not allowed'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  credentials: true
+};
+
 const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] }
+  cors: allowedOrigins ? {
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true
+  } : {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
 });
 
 // Setup logging
@@ -90,8 +115,20 @@ io.use((socket, next) => {
   next();
 });
 
-app.use(helmet());
-app.use(cors());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "blob:", "http:", "https:"],
+      connectSrc: ["'self'", "ws:", "wss:", "http:", "https:"]
+    }
+  },
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
