@@ -207,6 +207,18 @@ function App() {
             >
               {isLightMode ? '🌙' : '☀️'}
             </button>
+            <span 
+              className={`connection-dot ${connected ? 'online' : 'offline'}`}
+              title={connected ? 'Terhubung langsung' : 'Menghubungkan...'}
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                backgroundColor: connected ? '#10b981' : '#f59e0b',
+                display: 'inline-block',
+                boxShadow: connected ? '0 0 8px rgba(16, 185, 129, 0.6)' : 'none'
+              }}
+            />
             <span className="table-badge">Meja {table?.number || tableId.replace('table-', '')}</span>
           </div>
         </header>
