@@ -14,6 +14,7 @@ const auth = require('./auth');
 const multer = require('multer');
 const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 db.init();
 const s = db.getStatements();
@@ -684,9 +685,9 @@ app.post('/api/tables', auth.requireAdmin, (req, res) => {
   try {
     const s = require('./db').getStatements();
     s.createTable.run(id, parseInt(number), token);
-    const QRCode = require('qrcode');
-    const qrData = JSON.stringify({ tableId: id, tableNumber: number, url: `${process.env.PUBLIC_URL || 'http://localhost:3000'}/?t=${id}&k=${token}` });
-    QRCode.toDataURL(qrData, (err, url) => {
+    const baseUrl = process.env.BASE_URL || process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+    const qrUrl = `${baseUrl}/customer.html?table=${id}&access=${encodeURIComponent(token)}`;
+    QRCode.toDataURL(qrUrl, (err, url) => {
       if (!err) s.updateTableQrCode.run(url, id);
       io.emit('table-updated');
       res.json({ id, number, qrCode: url });
@@ -764,18 +765,23 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() });
 });
 
+// Serve root route to customer page
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/customer/index.html'));
+});
+
 // Serve customer page
-app.get('/customer.html', (req, res) => {
+app.get(['/customer', '/customer.html'], (req, res) => {
   res.sendFile(path.join(__dirname, '../public/customer/index.html'));
 });
 
 // Serve kitchen page
-app.get('/kitchen.html', (req, res) => {
+app.get(['/kitchen', '/kitchen.html'], (req, res) => {
   res.sendFile(path.join(__dirname, '../public/kitchen/index.html'));
 });
 
 // Serve admin/table management page
-app.get('/admin.html', (req, res) => {
+app.get(['/admin', '/admin.html'], (req, res) => {
   res.sendFile(path.join(__dirname, '../public/admin/index.html'));
 });
 

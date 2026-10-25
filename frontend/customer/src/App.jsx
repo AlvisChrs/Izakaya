@@ -8,11 +8,11 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin
 function App() {
   const [tableId] = useState(() => {
     const params = new URLSearchParams(window.location.search)
-    return params.get('table') || 'table-1'
+    return params.get('table') || params.get('t') || 'table-1'
   })
   const [tableAccessToken] = useState(() => {
     const params = new URLSearchParams(window.location.search)
-    return params.get('access')
+    return params.get('access') || params.get('k') || ''
   })
   const [table, setTable] = useState(null)
   const [menu, setMenu] = useState([])
