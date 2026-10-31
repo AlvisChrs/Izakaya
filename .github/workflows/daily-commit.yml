@@ -1,0 +1,29 @@
+ name: Daily Activity Update
+
+    on:
+      schedule:
+        # Otomatis jalan tiap hari jam 01:00 UTC (08:00 WIB)
+        - cron: '0 1 * * *'
+      workflow_dispatch: # Tombol manual jika ingin trigger sewaktu-waktu
+
+    permissions:
+      contents: write
+
+    jobs:
+      daily-commit:
+        runs-on: ubuntu-latest
+        steps:
+          - name: Checkout repository
+            uses: actions/checkout@v4
+
+          - name: Update activity log
+            run: |
+              echo "Last active: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> ACTIVITY.md
+
+          - name: Commit and Push
+            run: |
+              git config --local user.email "alvischristian19@gmail.com"
+              git config --local user.name "AlvisChrs"
+              git add ACTIVITY.md
+              git commit -m "chore(activity): update daily activity [skip ci]" || exit 0
+              git push
