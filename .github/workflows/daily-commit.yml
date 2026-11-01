@@ -1,10 +1,9 @@
  name: Daily Activity Update
 
-    on:
+    "on":
       schedule:
-        # Otomatis jalan tiap hari jam 01:00 UTC (08:00 WIB)
         - cron: '0 1 * * *'
-      workflow_dispatch: # Tombol manual jika ingin trigger sewaktu-waktu
+      workflow_dispatch:
 
     permissions:
       contents: write
